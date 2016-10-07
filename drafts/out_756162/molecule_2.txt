@@ -1,0 +1,13 @@
+B 10 C
+B 5 C
+B 8 C
+B 4 C
+B 11 I
+B 6 C
+B 9 C
+B 12 I
+B 7 I
+B 2 I
+B 3 C
+B 1 I
+B 13 I
