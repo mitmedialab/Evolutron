@@ -4,12 +4,12 @@ import os
 
 from evolutron.tools import Handle
 
-# x = os.listdir('models/CoMET/')
+# x = os.listdir('networks/CoMET/')
 # x.remove('c2h2')
 # x.remove('cohst')
 #
 # for t in x:
-fold = 'models/CoMET/type2p/'
+fold = 'networks/CoMET/type2p/'
 for f in os.listdir(fold):
 
     h = Handle.from_filename(fold + f)

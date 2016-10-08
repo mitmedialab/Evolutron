@@ -79,6 +79,6 @@ net.fit(x_train, np.asarray(y_train))
 #
 # print('trained final model')
 # hyperparameters = np.asarray([num_epochs, batch_size, filters, filter_size])
-# np.savez_compressed('models/type2p_pad/{0}_{1}_{2}_{3}.npz'.format(num_epochs, batch_size, filters, filter_size),
+# np.savez_compressed('networks/type2p_pad/{0}_{1}_{2}_{3}.npz'.format(num_epochs, batch_size, filters, filter_size),
 #                     hyperparameters,
 #                     *lasagne.layers.get_all_param_values(network))

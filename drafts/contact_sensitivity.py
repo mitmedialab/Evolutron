@@ -72,7 +72,7 @@ def mutation_sample(seq, positions, size):
 
 
 # Load the network to use for the evaluations
-net_file = 'models/o_smodel_500_150_100_6.npz'
+net_file = 'networks/o_smodel_500_150_100_6.npz'
 score_cnn = load_evolutron(net_file)
 
 # Load sequence to be tested

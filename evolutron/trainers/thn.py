@@ -624,7 +624,7 @@ class DeepTrainer:
         handle.ftype = 'model'
         handle.epochs = len(self.train_err_mem)
 
-        filename = 'models/' + handle
+        filename = 'networks/' + handle
 
         params = self.get_all_param_values()
 
@@ -639,7 +639,7 @@ class DeepTrainer:
         assert (not self.train_err_mem == [])
         handle.ftype = 'history'
         handle.epochs = len(self.train_err_mem)
-        filename = 'models/' + handle
+        filename = 'networks/' + handle
         np.savez_compressed(filename,
                             train_err_mem=self.train_err_mem, val_err_mem=self.val_err_mem,
                             train_acc_mem=self.train_acc_mem, val_acc_mem=self.val_acc_mem,
