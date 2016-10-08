@@ -13,7 +13,7 @@ from evolutron.trainers.thn import ConvType2p
 # def main(mode, padded, handle=None, **options):
 padded = True
 
-filename = 'models/type2p/200_150_50_50.model.npz'
+filename = 'networks/type2p/200_150_50_50.model.npz'
 filters = int(filename.split('_')[2])
 filter_size = int(filename.split('_')[2])
 

@@ -19,18 +19,18 @@ def test_type2p():
     type2p.main('train', True, handle='test', validation=0.2, holdout=0.1, **options)
     type2p.main('k_fold', True, handle='test', num_folds=2, **options)
 
-    os.remove('models/type2p/test.history.npz')
-    os.remove('models/type2p/test.k_fold.npz')
-    os.remove('models/type2p/test.model.npz')
+    os.remove('networks/type2p/test.history.npz')
+    os.remove('networks/type2p/test.k_fold.npz')
+    os.remove('networks/type2p/test.model.npz')
 
     print('\n Testing un-padded sequences')
 
     type2p.main('train', False, handle='test', validation=0.2, holdout=0.1, **options)
     type2p.main('k_fold', False, handle='test', num_folds=2, **options)
 
-    os.remove('models/type2p/test.history.npz')
-    os.remove('models/type2p/test.k_fold.npz')
-    os.remove('models/type2p/test.model.npz')
+    os.remove('networks/type2p/test.history.npz')
+    os.remove('networks/type2p/test.k_fold.npz')
+    os.remove('networks/type2p/test.model.npz')
 
 
 def test_zfb1h():
@@ -44,18 +44,18 @@ def test_zfb1h():
     zfb1h.main('train', True, handle='test', validation=0.2, holdout=0.1, **options)
     zfb1h.main('k_fold', True, handle='test', num_folds=2, **options)
 
-    os.remove('models/b1h/test.history.npz')
-    os.remove('models/b1h/test.k_fold.npz')
-    os.remove('models/b1h/test.model.npz')
+    os.remove('networks/b1h/test.history.npz')
+    os.remove('networks/b1h/test.k_fold.npz')
+    os.remove('networks/b1h/test.model.npz')
 
     print('\n Testing un-padded sequences')
 
     zfb1h.main('train', False, handle='test', validation=0.2, holdout=0.1, **options)
     zfb1h.main('k_fold', False, handle='test', num_folds=2, **options)
 
-    os.remove('models/b1h/test.history.npz')
-    os.remove('models/b1h/test.k_fold.npz')
-    os.remove('models/b1h/test.model.npz')
+    os.remove('networks/b1h/test.history.npz')
+    os.remove('networks/b1h/test.k_fold.npz')
+    os.remove('networks/b1h/test.model.npz')
 
 
 # def test_comet():

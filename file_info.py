@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
-import evolutron.models.thn as nets
+import evolutron.networks.thn as nets
 from evolutron.trainers.thn import DeepTrainer
 
 

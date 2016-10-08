@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, roc_curve, precision_recall_curve
 from sklearn.metrics import auc
 
-filename = 'models/m6a/201_1_3_15.k_fold.npz'
+filename = 'networks/m6a/201_1_3_15.k_fold.npz'
 
 with np.load(filename) as f:
     val_losses = f['val_loss']

@@ -12,7 +12,7 @@ import numpy as np
 from sklearn.cross_validation import KFold, StratifiedKFold
 from tabulate import tabulate
 from collections import OrderedDict, defaultdict
-from evolutron.models.tnf import tfDREAM
+from evolutron.networks.tnf import tfDREAM
 
 
 class DeepTrainer:

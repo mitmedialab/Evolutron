@@ -59,7 +59,7 @@ def main():
     # scorefxn2.set_weight(fa_rep, 1.0)
 
     # Initialize Evolutron scoring function
-    filename = 'models/o_smodel_500_150_30_30.npz'
+    filename = 'networks/o_smodel_500_150_30_30.npz'
     score_cnn = load_evolutron(filename)
 
     # Load initial protein and view in PyMol

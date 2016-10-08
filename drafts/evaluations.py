@@ -19,5 +19,5 @@ def plot_training_history(filename):
     plt.show()
 
 
-filename = 'models/b1h/150_64_15.history.npz'
+filename = 'networks/b1h/150_64_15.history.npz'
 plot_training_history(filename)

@@ -2,12 +2,11 @@
 from .io_tools import *
 
 
-def data_it(dataset):
+def data_it(dataset, block_size):
     size = len(dataset)
-    batch_size = 2000
 
-    for start_idx in range(0, size, batch_size):
-        excerpt = slice(start_idx, min(start_idx + batch_size, size))
+    for start_idx in range(0, size, block_size):
+        excerpt = slice(start_idx, min(start_idx + block_size, size))
         yield dataset[excerpt]
 
 
@@ -46,8 +45,6 @@ def load_dataset(data_id, shuffled=False, **parser_options):
         dataset = fasta_parser('datasets/uniprot_type2.fasta', **parser_options)
     elif data_id == 'm6a':
         dataset = m6a(**parser_options)
-    elif data_id == 'dream':
-        dataset = dream_parser(**parser_options)
     else:
         print('Something went terribly wrong...')
         return 1

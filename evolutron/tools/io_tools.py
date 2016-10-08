@@ -1,7 +1,7 @@
 # coding=utf-8
 try:
     import cPickle
-except:
+except ImportError:
     import pickle as cPickle
 import csv
 
@@ -230,30 +230,4 @@ def fasta_parser(filename, padded=False, min_aa=None, max_aa=None):
     data_set = x_data
 
     return data_set
-
-
-def dream_parser(filename, threshold):
-
-    # if filename[-2] == 'gz':
-
-    f = gzip.open(filename, 'rb')
-
-    x_data = []
-
-    y_data = []
-
-    for line in f:
-        aa_seq, dnase, label, mask = line.split('\t')
-        aa_seq = np.concatenate([nt_map[i] for i in aa_seq]).astype(np.float32)
-        dnase = np.asarray(eval(dnase), dtype=np.float32)
-        label = np.asarray(eval(label), dtype=np.float32)
-        np.place(label, label == 2., threshold)
-        mask = np.asarray(eval(mask), dtype=np.float32)
-
-        x_data.append(np.concatenate((aa_seq, dnase)))
-        y_data.append(np.concatenate((label, mask)))
-
-    return np.asarray(x_data), np.asarray(y_data)
-
-
 
