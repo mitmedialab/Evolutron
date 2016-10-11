@@ -7,10 +7,9 @@ import csv
 
 import numpy as np
 from Bio import SeqIO
-import gzip
 import pandas as pd
 
-from evolutron.tools.seq_tools import aa_map, nt_map, num2hot, aa2hot
+from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot
 
 
 ############################
@@ -45,9 +44,33 @@ class ZincFinger(Protein):
         return '{x.name} {x.nt_num} nt {x.aa_num} aa'.format(x=self)
 
 
+database = {
+    'type2p': '',
+    'c2h2': '',
+    'hsapiens': 'datasets/sprot_hsapiens_pfam',
+    'ecoli': 'datasets/sprot_ecoli_pfam',
+    'zinc': 'datasets/sprot_znf_prot_pfam',
+    'homeo': 'datasets/sprot_homeo_pfam',
+    'cd4': 'datasets/sprot_cd4_pfam',
+    'dnabind': 'datasets/sprot_dna_tf_pfam'
+}
+
 ############################
 # -------- Functions ------- #
 ############################
+
+def count_lines(f):
+    """ Counts the lines of large files by blocks.
+    """
+
+    def blocks(files, size=65536):
+        while True:
+            b = files.read(size)
+            if not b:
+                break
+            yield b
+
+    return sum(bl.count("\n") for bl in blocks(f))
 
 
 def b1h(padded=False, min_aa=None, max_aa=None):
@@ -82,9 +105,9 @@ def b1h(padded=False, min_aa=None, max_aa=None):
 
     y_data = np.asarray([zf.rec_site.reshape(16) for zf in znf if zf.aa.find('X') == -1])
 
-    data_set = x_data, y_data
+    dataset = x_data, y_data
 
-    return data_set
+    return dataset
 
 
 def m6a(padded=False, min_aa=None, max_aa=None, probe='both'):
@@ -139,9 +162,9 @@ def m6a(padded=False, min_aa=None, max_aa=None, probe='both'):
 
     y_data = np.asarray(conc_list)
 
-    data_set = x_data, y_data
+    dataset = x_data, y_data
 
-    return data_set
+    return dataset
 
 
 def type2p(padded=False, min_aa=None, max_aa=None):
@@ -186,9 +209,9 @@ def type2p(padded=False, min_aa=None, max_aa=None):
             y_data[ind][j, :] = np.asarray(nt_map[nt])
         y_data[ind] = y_data[ind].reshape(24)
 
-    data_set = x_data, y_data
+    dataset = x_data, y_data
 
-    return data_set
+    return dataset
 
 
 def fasta_parser(filename, padded=False, min_aa=None, max_aa=None):
@@ -228,16 +251,32 @@ def fasta_parser(filename, padded=False, min_aa=None, max_aa=None):
                     break
                 x_data[ind][int(aa_map[aa]), j] = 1
 
-    data_set = x_data
+    dataset = x_data
 
-    return data_set
+    return dataset
 
 
-def tab_parser(filename):
-    raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
+def tab_parser(data_id, padded=True, min_aa=None, max_aa=None):
+    try:
+        raw_data = pd.read_hdf(database[data_id] + '.h5', 'table')
+    except IOError:
+        filename = database[data_id] + '.tsv'
 
-    raw_data['x_data'] = raw_data.Sequence.apply(aa2hot)
+        raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
 
-    raw_data.to_hdf(filename[:-3] + 'h5', 'table')
+        raw_data['x_data'] = raw_data.Sequence.apply(aa2hot)
 
-    return raw_data
+        raw_data.to_hdf(filename[:-3] + 'h5', 'table')
+
+    x_data = raw_data['x_data'].tolist()
+
+    if not padded:
+        return x_data
+
+    if not max_aa:
+        max_aa = max(x.shape[1] for x in x_data)
+
+    dataset = np.asarray([np.pad(x, pad_width=((0, 0), (0, max_aa - x.shape[1])),
+                                 mode='constant', constant_values=0) for x in x_data])
+
+    return dataset

@@ -75,26 +75,36 @@ Transformations between representations
 """
 
 
-def aa2num(aa_seq):
-    """ Transforms an amino acid sequence into a float representation. """
-    return [aa_map[aa] for aa in
-            aa_seq.replace('X', 'M').replace('Z', 'Q').replace('B', 'N').replace('U', 'S').replace('O', 'K')]
-
-
-def num2aa(num_seq):
-    return ''.join([aa_map_rev[n] for n in num_seq])
-
-
-def num2hot(num):
-    return np.eye(20, dtype=np.float32)[num].T
-
-
-def hot2num(hot):
-    return [np.argmax(h) for h in hot.T]
+# Deprecated functions will be removed after a month of no use
+# def _aa2num(aa_seq):
+#     """ Transforms an amino acid sequence into a float representation. """
+#     return [aa_map[aa] for aa in
+#             aa_seq.replace('X', 'M').replace('Z', 'Q').replace('B', 'N').replace('U', 'S').replace('O', 'K')]
+#
+#
+# def _num2aa(num):
+#     return ''.join([aa_map_rev[n] for n in num])
+#
+#
+# def _num2hot(num):
+#     return np.eye(20, dtype=np.float32)[num].T
+#
+#
+# def _hot2num(hot):
+#     return [np.argmax(h) for h in hot.T]
 
 
 def aa2hot(aa_seq):
-    return num2hot(aa2num(aa_seq))
+    num = [aa_map[aa] for aa in
+           aa_seq.replace('X', 'M').replace('Z', 'Q').replace('B', 'N').replace('U', 'S').replace('O', 'K')]
+
+    return np.eye(20, dtype=np.float32)[num].T
+
+
+def hot2aa(hot):
+    num = [np.argmax(h) for h in hot.T]
+
+    return ''.join([aa_map_rev[n] for n in num])
 
 
 def nt2prob(seq):

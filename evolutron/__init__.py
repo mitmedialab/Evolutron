@@ -6,4 +6,12 @@ For more information, contact:
 """
 from __future__ import absolute_import, print_function, division
 
-__docformat__ = "restructuredtext en"
+# from . import evaluations
+from . import helpers
+from . import motifs
+from . import networks
+from . import structural
+from . import tools
+from . import trainers
+
+__version__ = "0.1.alpha"

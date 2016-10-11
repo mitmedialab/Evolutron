@@ -1,9 +1,12 @@
 # coding=utf-8
-from .io_tools import *
-import pandas as pd
+import numpy as np
+
+from evolutron.tools import io_tools as io
 
 
 def data_it(dataset, block_size):
+    """ Iterates through a large array, yielding chunks of block_size.
+    """
     size = len(dataset)
 
     for start_idx in range(0, size, block_size):
@@ -11,58 +14,41 @@ def data_it(dataset, block_size):
         yield dataset[excerpt]
 
 
-# noinspection PyShadowingNames
-def load_dataset(data_id, shuffled=False, **parser_options):
-    """
-    Load the dataset 
-    :return: train, validation and test sets
+def load_dataset(data_id, **parser_options):
+    """Fetches the correct dataset from database based on data_id.
     """
 
-    if data_id == 'type2p':
-        dataset, _ = type2p(**parser_options)
-    elif data_id == 't2pneb':
-        dataset = type2p(**parser_options)
-    elif data_id == 'c2h2':
-        dataset, _ = b1h(**parser_options)
-    elif data_id == 'b1h':
-        dataset = b1h(**parser_options)
-    elif data_id == 'swissprot':
-        dataset = fasta_parser('datasets/uniprot_sprot.fasta', **parser_options)
-    elif data_id == 'cas9':
-        dataset = fasta_parser('datasets/uniprot_cas9.fasta', **parser_options)
-    elif data_id == 'zinc':
-        dataset = fasta_parser('datasets/uniprot_zinc.fasta', **parser_options)
-    elif data_id == 'homeo':
-        dataset = fasta_parser('datasets/uniprot_homeo.fasta', **parser_options)
-    elif data_id == 'ecoli':
-        dataset = fasta_parser('datasets/uniprot_ecoli.fasta', **parser_options)
-    elif data_id == 'hsapiens':
-        try:
-            dataframe = pd.read_hdf('datasets/uniprot_hsapiens.h5', 'table')
-        except IOError:
-            dataframe = tab_parser('datasets/uniprot_hsapiens.tsv')
+    dataset = io.tab_parser(data_id, **parser_options)
 
-        dataset = dataframe.x_data.tolist()
-    elif data_id == 'dnabind':
-        dataset = fasta_parser('datasets/uniprot_dnabind.fasta', **parser_options)
-    elif data_id == 'random':
-        dataset = fasta_parser('datasets/random_aa.fasta', **parser_options)
-    elif data_id == 'type2':
-        dataset = fasta_parser('datasets/uniprot_type2.fasta', **parser_options)
-    elif data_id == 'm6a':
-        dataset = m6a(**parser_options)
-    else:
-        print('Something went terribly wrong...')
-        return 1
+    try:
+        assert type(dataset) == np.ndarray or type(dataset) == list
+    except AssertionError:
+        if data_id == 'type2p':
+            dataset, _ = io.type2p(**parser_options)
+        elif data_id == 't2pneb':
+            dataset = io.type2p(**parser_options)
+        elif data_id == 'c2h2':
+            dataset, _ = io.b1h(**parser_options)
+        elif data_id == 'b1h':
+            dataset = io.b1h(**parser_options)
+        elif data_id == 'swissprot':
+            dataset = io.fasta_parser('datasets/uniprot_sprot.fasta', **parser_options)
+        elif data_id == 'cas9':
+            dataset = io.fasta_parser('datasets/uniprot_cas9.fasta', **parser_options)
+        elif data_id == 'random':
+            dataset = io.fasta_parser('datasets/random_aa.fasta', **parser_options)
+        elif data_id == 'type2':
+            dataset = io.fasta_parser('datasets/uniprot_type2.fasta', **parser_options)
+        elif data_id == 'm6a':
+            dataset = io.m6a(**parser_options)
+        else:
+            print('Something went terribly wrong...')
+            return 1
 
     if len(dataset) > 2:
         # Unsupervised Learning
         # x: observations
         x_data = dataset
-
-        # Shuffle the data to have un-biased minibatches
-        if shuffled:
-            np.random.shuffle(x_data)
 
         # If sequences are padded, transform data list into a numpy array for mini-batching
         if all(x.shape == x_data[0].shape for x in x_data):
@@ -84,13 +70,6 @@ def load_dataset(data_id, shuffled=False, **parser_options):
             raise IOError
         data_size = len(x_data)
 
-        # Shuffle the data to have un-biased minibatches
-        if shuffled:
-            rng_state = np.random.get_state()
-            np.random.shuffle(x_data)
-            np.random.set_state(rng_state)
-            np.random.shuffle(y_data)
-
         # If sequences are padded, transform data list into a numpy array for mini-batching
         try:
             x_data = np.asarray(x_data, dtype=np.float32)
@@ -103,15 +82,3 @@ def load_dataset(data_id, shuffled=False, **parser_options):
         return x_data, y_data
     else:
         raise IOError("Dataset import fault.")
-
-
-def blocks(files, size=65536):
-    while True:
-        b = files.read(size)
-        if not b:
-            break
-        yield b
-
-
-def count_lines(f):
-    return sum(bl.count("\n") for bl in blocks(f))

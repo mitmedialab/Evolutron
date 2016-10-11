@@ -3,11 +3,71 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
-import evolutron.networks.thn as nets
-from evolutron.trainers.thn import DeepTrainer
+from evolutron.tools import Handle
+
+
+def folder_info(foldername):
+    import pandas as pd
+    import glob
+
+    h_files = glob.glob(foldername + '/*.history.npz')
+
+    opt_matrix = []
+
+    for f in h_files:
+        handle = Handle.from_filename(f)
+
+        with np.load(f) as data:
+            val_acc_mem = data['val_acc_mem']
+            train_acc_mem = data['train_acc_mem']
+
+        opt_matrix.append((handle.filter_size, handle.filters, train_acc_mem[-1], val_acc_mem[-1]))
+
+    opt_matrix = np.asarray(opt_matrix)
+
+    train_acc_df = pd.DataFrame(index=np.unique(opt_matrix[:, 0]).astype(np.int64),
+                                columns=np.unique(opt_matrix[:, 1]).astype(np.int64)).astype(np.float32)
+    val_acc_df = pd.DataFrame(index=np.unique(opt_matrix[:, 0]).astype(np.int64),
+                              columns=np.unique(opt_matrix[:, 1]).astype(np.int64)).astype(np.float32)
+
+    for f_s, f_l, tr_ac, vl_ac in opt_matrix:
+        train_acc_df.loc[int(f_s), int(f_l)] = tr_ac
+        val_acc_df.loc[int(f_s), int(f_l)] = vl_ac
+
+    from pandas.tools.plotting import table
+    import matplotlib.pyplot as plt
+    ax1 = plt.subplot(211, frame_on=False)
+    ax1.xaxis.set_visible(False)
+    ax1.yaxis.set_visible(False)
+    ax1.set_title('Training Accuracies')
+
+    values = np.nan_to_num(train_acc_df.as_matrix())
+    normal = plt.Normalize(values.min() - 1, values.max() + 1)
+    tab1 = table(ax1, train_acc_df, loc='center', cellColours=plt.cm.YlGn(normal(values)))
+
+    ax2 = plt.subplot(212, frame_on=False)
+    ax2.xaxis.set_visible(False)
+    ax2.yaxis.set_visible(False)
+    ax2.set_xlabel('Number of filters')
+    ax2.set_ylabel('Filter Size')
+    ax2.set_title('Validation Accuracies')
+
+    values = np.nan_to_num(val_acc_df.as_matrix())
+    normal = plt.Normalize(values.min() - 2, values.max() + 2)
+    tab2 = table(ax2, val_acc_df, loc='center',
+                 cellLoc='center',
+                 cellColours=plt.cm.YlGn(normal(values)))
+
+    fig = plt.gcf()
+    fig.set_facecolor('white')
+    fig.set_size_inches(8, 11.5)
+    plt.savefig('CoMET/show/' + handle.dataset + '.hyper_mat.pdf')
+    plt.show()
 
 
 def main(filename, **options):
+    import evolutron.networks.thn as nets
+    from evolutron.trainers.thn import DeepTrainer
 
     if '.fasta' in filename:
         count = 0
@@ -102,13 +162,18 @@ def main(filename, **options):
                 except KeyboardInterrupt:
                     return
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Network visualization module.')
     parser.add_argument("filename", help='Path to the file')
-    parser.add_argument("--graph", "-g",  action='store_true')
+    parser.add_argument("--graph", action='store_true')
+    parser.add_argument("--folder", action='store_true')
 
     args = parser.parse_args()
 
     kwargs = {'graph': args.graph}
 
-    main(args.filename, **kwargs)
+    if args.folder:
+        folder_info(args.filename)
+    else:
+        main(args.filename, **kwargs)
