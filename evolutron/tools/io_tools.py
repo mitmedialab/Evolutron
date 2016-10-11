@@ -8,8 +8,9 @@ import csv
 import numpy as np
 from Bio import SeqIO
 import gzip
+import pandas as pd
 
-from evolutron.tools.seq_tools import aa_map, nt_map, num2hot
+from evolutron.tools.seq_tools import aa_map, nt_map, num2hot, aa2hot
 
 
 ############################
@@ -231,3 +232,12 @@ def fasta_parser(filename, padded=False, min_aa=None, max_aa=None):
 
     return data_set
 
+
+def tab_parser(filename):
+    raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
+
+    raw_data['x_data'] = raw_data.Sequence.apply(aa2hot)
+
+    raw_data.to_hdf(filename[:-3] + 'h5', 'table')
+
+    return raw_data

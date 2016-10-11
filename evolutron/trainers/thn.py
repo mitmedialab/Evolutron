@@ -9,7 +9,7 @@ from itertools import izip
 import lasagne
 import numpy as np
 import theano
-from sklearn.cross_validation import KFold, StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.metrics import roc_auc_score, average_precision_score
 from tabulate import tabulate
 
@@ -104,7 +104,7 @@ class DeepTrainer:
         return theano.function(inputs, conv_scores)
 
     @staticmethod
-    def _split_dataset(data_size, holdout, validate):
+    def _split_dataset(data_size, holdout, validate):  # TODO: Check scikit learn implementation
 
         test_idx = range(0, int(holdout * data_size))
 
@@ -118,9 +118,13 @@ class DeepTrainer:
     def _iterate_minibatches(X, y, batch_size):
         assert len(X) == len(y)
 
-        for start_idx in range(0, len(X), batch_size):
-            excerpt = slice(start_idx, min(start_idx + batch_size, len(X)))
-            yield X[excerpt], y[excerpt]  # TODO: yield excerpt
+        if batch_size == 1:
+            for idx in range(0, len(X)):
+                yield [X[idx]], [y[idx]]
+        else:
+            for start_idx in range(0, len(X), batch_size):
+                excerpt = slice(start_idx, min(start_idx + batch_size, len(X)))
+                yield X[excerpt], y[excerpt]  # TODO: yield excerpt
 
     @staticmethod
     def _iterate_huge(X, y, block_size):
@@ -130,119 +134,6 @@ class DeepTrainer:
         for start_idx in range(0, len(X), block_size):
             excerpt = slice(start_idx, min(start_idx + block_size, len(X)))
             yield X[excerpt], y[excerpt]
-
-    def fit_dream(self, train_set_x, train_set_y, valid_set_x=None, valid_set_y=None, epochs=1):
-        # TODO: implement run on multiple gpus
-        train_size = train_set_x.shape[0]
-
-        # Early-stopping parameters
-        patience = 100000000  # look as this many examples regardless
-        patience_increase = 2  # wait this times much longer when a new best is found
-        improvement_threshold = 0.998  # a relative improvement of this much is considered significant
-        best_validation_loss = np.inf
-        it = 0
-        done_looping = False
-
-        epochs = min(epochs, self.max_epochs)
-        epoch = 0
-        start_time = time.time()
-        print(tabulate(
-            [['Epoch', 'Train Loss', 'Train Acc', 'Val Loss', 'Val Acc', 'Val PRC AUC', 'Val ROC AUC', 'Time']],
-            stralign='center',
-            headers="firstrow"))
-        # We iterate over epochs:
-        try:
-            while epoch < epochs and not done_looping:
-                epoch += 1
-
-                # In each epoch, we do a full pass over the training data:
-                train_err = []
-                train_acc = []
-                epoch_time = time.time()
-                # count=0
-                for X, y in self._iterate_huge(train_set_x, train_set_y, self.batch_size):
-                    err, acc = self.train_fn(X[:, :800].reshape((-1, 4, 200)),
-                                             X[:, 800:].reshape((-1, 1, 100)),
-                                             y[:, :32],
-                                             y[:, 32:])
-                    # gpuX = theano.shared(X, borrow=True)
-                    # err, acc = self.train_fn(X[:, :800].reshape((-1, 4, 200)),
-                    #                          X[:, 800:].reshape((-1, 1, 100)),
-                    #                          y[:, :32],
-                    #                          y[:, 32:])
-
-                    # err, acc = self.train_fn([index], ... , givens={'seq': gpuX[:, :800].reshape((-1, 4, 200))
-                    #                                                        }
-                    # TODO: accuracy to be auPRC
-                    train_err.append(err)
-                    train_acc.append(acc)
-
-                # After that, we do a full pass over the validation data:
-                val_err = []
-                val_acc = []
-                val_roc_auc = []
-                val_prc_auc = []
-                for X, y in self._iterate_huge(valid_set_x, valid_set_y, 50000):
-                    # X_sh = theano.shared(X, borrow=True)
-                    # y_sh = theano.shared(y, borrow=True)
-                    # iterate minibatch
-                    for X_min, y_min in self._iterate_minibatches(X, y, self.batch_size):
-
-                        err, acc, preds = self.val_pred(X_min[:, :800].reshape((-1, 4, 200)),
-                                                        X_min[:, 800:].reshape((-1, 1, 100)),
-                                                        y_min[:, :32],
-                                                        y_min[:, 32:])
-
-                    for tf_true, tf_pred in izip(y[:, :32].reshape((32, -1)), preds.reshape((32, -1))):
-                        tf_mask = np.logical_or(tf_true == 0., tf_true == 1.)
-                        try:
-                            val_roc_auc.append(roc_auc_score(tf_true[tf_mask],
-                                                             tf_pred[tf_mask]))
-                            val_prc_auc.append(average_precision_score(tf_true[tf_mask],
-                                                                       tf_pred[tf_mask]))
-                        except ValueError:
-                            pass
-
-                    val_err.append(err)
-                    val_acc.append(acc)
-
-                self.train_err_mem.append(np.mean(train_err))
-                self.train_acc_mem.append(100 * np.mean(train_acc))
-                self.val_err_mem.append(np.mean(val_err))
-                self.val_acc_mem.append(100 * np.mean(val_acc))
-                self.val_prc_auc_mem.append(100 * np.mean(val_prc_auc))
-                self.val_roc_auc_mem.append(100 * np.mean(val_roc_auc))
-
-                print(tabulate(
-                    [['Epoch', 'Train Loss', 'Train Acc', 'Val Loss', 'Val Acc', 'Val PRC AUC', 'Val ROC AUC', 'Time'],
-                     ["{}/{}".format(epoch, epochs),
-                      self.train_err_mem[-1], self.train_acc_mem[-1],
-                      self.val_err_mem[-1], self.val_acc_mem[-1],
-                      self.val_prc_auc_mem[-1], self.val_roc_auc_mem[-1],
-                      "{:.3f}s".format(time.time() - epoch_time)]],
-                    tablefmt='plain', floatfmt=".6f", stralign='center',
-                    headers="firstrow").rsplit('\n', 1)[-1])
-
-                # If we have the best validation score until now
-                if self.val_err_mem[-1] < best_validation_loss:
-
-                    # Increase patience if loss improvement is good enough
-                    if self.val_err_mem[-1] < best_validation_loss * improvement_threshold:
-                        patience = max(patience, it * patience_increase)
-
-                    # save best validation score and iteration number
-                    best_validation_loss = self.val_err_mem[-1]
-
-                # print(self.get_all_param_values())
-
-                # Stop if above early stopping limit
-                it = (epoch - 1) * train_size
-                if patience <= it and self.patience:
-                    done_looping = True
-        except KeyboardInterrupt:
-            return
-
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(epoch, time.time() - start_time))
 
     def fit(self, x_data, y_data, epochs=1, holdout=.0, validate=.0):
         assert (validate >= 0 and holdout >= 0)
@@ -313,10 +204,16 @@ class DeepTrainer:
                 train_acc = []
                 epoch_time = time.time()
                 # count=0
+
                 for X, y in self._iterate_minibatches(train_set_x, train_set_y, self.batch_size):
-                    err, acc = self.train_fn(X, y)
-                    train_err.append(err)
-                    train_acc.append(acc)
+
+                    try:
+                        err, acc = self.train_fn(X, y)
+                        train_err.append(err)
+                        train_acc.append(acc)
+                    except MemoryError:
+                        print(X[0].shape)
+                        pass
                     # print (self.f(X))
                     # print(pred)
                     # print(targ)
@@ -329,9 +226,13 @@ class DeepTrainer:
                 val_err = []
                 val_acc = []
                 for X, y in self._iterate_minibatches(valid_set_x, valid_set_y, self.batch_size):
-                    err, acc = self.val_fn(X, y)
-                    val_err.append(err)
-                    val_acc.append(acc)
+                    try:
+                        err, acc = self.val_fn(X, y)
+                        val_err.append(err)
+                        val_acc.append(acc)
+                    except MemoryError:
+                        print(X[0].shape)
+                        pass
 
                 self.train_err_mem.append(np.mean(train_err))
                 self.train_acc_mem.append(100 * np.mean(train_acc))
@@ -624,7 +525,7 @@ class DeepTrainer:
         handle.ftype = 'model'
         handle.epochs = len(self.train_err_mem)
 
-        filename = 'networks/' + handle
+        filename = 'models/' + handle
 
         params = self.get_all_param_values()
 
@@ -639,7 +540,7 @@ class DeepTrainer:
         assert (not self.train_err_mem == [])
         handle.ftype = 'history'
         handle.epochs = len(self.train_err_mem)
-        filename = 'networks/' + handle
+        filename = 'models/' + handle
         np.savez_compressed(filename,
                             train_err_mem=self.train_err_mem, val_err_mem=self.val_err_mem,
                             train_acc_mem=self.train_acc_mem, val_acc_mem=self.val_acc_mem,

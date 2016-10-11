@@ -1,5 +1,6 @@
 # coding=utf-8
 from .io_tools import *
+import pandas as pd
 
 
 def data_it(dataset, block_size):
@@ -36,7 +37,12 @@ def load_dataset(data_id, shuffled=False, **parser_options):
     elif data_id == 'ecoli':
         dataset = fasta_parser('datasets/uniprot_ecoli.fasta', **parser_options)
     elif data_id == 'hsapiens':
-        dataset = fasta_parser('datasets/uniprot_hsapiens.fasta', **parser_options)
+        try:
+            dataframe = pd.read_hdf('datasets/uniprot_hsapiens.h5', 'table')
+        except IOError:
+            dataframe = tab_parser('datasets/uniprot_hsapiens.tsv')
+
+        dataset = dataframe.x_data.tolist()
     elif data_id == 'dnabind':
         dataset = fasta_parser('datasets/uniprot_dnabind.fasta', **parser_options)
     elif data_id == 'random':
@@ -54,8 +60,6 @@ def load_dataset(data_id, shuffled=False, **parser_options):
         # x: observations
         x_data = dataset
 
-        print('Dataset size: {0}'.format(len(dataset)))
-
         # Shuffle the data to have un-biased minibatches
         if shuffled:
             np.random.shuffle(x_data)
@@ -63,6 +67,8 @@ def load_dataset(data_id, shuffled=False, **parser_options):
         # If sequences are padded, transform data list into a numpy array for mini-batching
         if all(x.shape == x_data[0].shape for x in x_data):
             x_data = np.asarray(x_data, dtype=np.float32)
+
+        print('Dataset size: {0}'.format(len(dataset)))
 
         return x_data
 
@@ -77,7 +83,6 @@ def load_dataset(data_id, shuffled=False, **parser_options):
             print('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data)))
             raise IOError
         data_size = len(x_data)
-        print('Dataset size: {0}'.format(data_size))
 
         # Shuffle the data to have un-biased minibatches
         if shuffled:
@@ -92,6 +97,8 @@ def load_dataset(data_id, shuffled=False, **parser_options):
             y_data = np.asarray(y_data, dtype=np.float32)
         except ValueError:
             pass
+
+        print('Dataset size: {0}'.format(data_size))
 
         return x_data, y_data
     else:
