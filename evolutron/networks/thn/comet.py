@@ -16,11 +16,12 @@ import theano.tensor as ten
 
 
 class CoDER:
-    def __init__(self, pad_size, filters, filter_size):
+    def __init__(self, pad_size, batch_size, filters, filter_size):
         self.inp = {'aa_seq': ten.tensor3('aa_seq', dtype=theano.config.floatX)}
         self.targets = {'aa_seq': ten.tensor3('aa_rec_seq', dtype=theano.config.floatX)}
 
         self.pad_size = pad_size
+        self.batch_size = batch_size
         self.filters = filters
         self.filter_size = filter_size
 
@@ -32,7 +33,7 @@ class CoDER:
 
     def build_network(self):
         network = {'input': lasagne.layers.InputLayer(input_var=self.inp['aa_seq'],
-                                                      shape=(None, 20, self.pad_size),
+                                                      shape=(self.batch_size, 20, self.pad_size),
                                                       name='Input')}
 
         # Convolutional layer with M motifs of size m.
@@ -43,6 +44,7 @@ class CoDER:
                                                      nonlinearity=None,
                                                      W=lasagne.init.GlorotUniform('relu'),
                                                      stride=1,
+                                                     pad='full',
                                                      name='Conv1')
 
         network['conv_non_lin'] = lasagne.layers.NonlinearityLayer(network['conv'],

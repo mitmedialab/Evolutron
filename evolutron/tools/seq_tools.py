@@ -25,7 +25,7 @@ aa_map = {
     'E': 16,
     'D': 17,
     'S': 18,
-    'T': 19
+    'T': 19,
 }
 
 aa_map_rev = {
@@ -77,7 +77,8 @@ Transformations between representations
 
 def aa2num(aa_seq):
     """ Transforms an amino acid sequence into a float representation. """
-    return [aa_map[aa] for aa in aa_seq]
+    return [aa_map[aa] for aa in
+            aa_seq.replace('X', 'M').replace('Z', 'Q').replace('B', 'N').replace('U', 'S').replace('O', 'K')]
 
 
 def num2aa(num_seq):
@@ -85,11 +86,15 @@ def num2aa(num_seq):
 
 
 def num2hot(num):
-    return np.eye(max(num)+1, dtype=np.float32)[num].T
+    return np.eye(20, dtype=np.float32)[num].T
 
 
 def hot2num(hot):
     return [np.argmax(h) for h in hot.T]
+
+
+def aa2hot(aa_seq):
+    return num2hot(aa2num(aa_seq))
 
 
 def nt2prob(seq):

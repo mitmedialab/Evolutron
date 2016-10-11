@@ -1,13 +1,21 @@
 # coding=utf-8
 
+
 def none2str(s):
     if s is None:
         return ''
     return str(s)
 
 
+def shape(x):
+    try:
+        return x.shape
+    except AttributeError:
+        return None
+
 # TODO: make function that transforms a model from tf to theano and the opposite
 # .model.np -> .saver & summaries
+
 
 class Handle(object):
     def __init__(self, epochs=None,
