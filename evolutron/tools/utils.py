@@ -13,11 +13,14 @@ def shape(x):
     except AttributeError:
         return None
 
+
 # TODO: make function that transforms a model from tf to theano and the opposite
 # .model.np -> .saver & summaries
 
 
 class Handle(object):
+    """ Handles names for loading saving different models.
+    """
     def __init__(self, epochs=None,
                  batch_size=None,
                  filters=None,
@@ -42,24 +45,22 @@ class Handle(object):
         self.extra = extra
 
     def __str__(self):
-        return '{0}/{1}/{2}_{3}_{4}_{5}_{6}.{7}'.format(self.program,
-                                                        self.dataset,
-                                                        self.filters,
-                                                        self.filter_size,
-                                                        self.epochs,
-                                                        self.batch_size,
-                                                        self.model,
-                                                        self.ftype)
+        return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
+                                                    self.filters,
+                                                    self.filter_size,
+                                                    self.epochs,
+                                                    self.batch_size,
+                                                    self.model,
+                                                    self.ftype)
 
     def __repr__(self):
-        return '{0}/{1}/{2}_{3}_{4}_{5}_{6}.{7}'.format(self.program,
-                                                        self.dataset,
-                                                        self.filters,
-                                                        self.filter_size,
-                                                        self.epochs,
-                                                        self.batch_size,
-                                                        self.model,
-                                                        self.ftype)
+        return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
+                                                    self.filters,
+                                                    self.filter_size,
+                                                    self.epochs,
+                                                    self.batch_size,
+                                                    self.model,
+                                                    self.ftype)
 
     def __add__(self, other):
         return str(self) + other
@@ -69,9 +70,7 @@ class Handle(object):
 
     @classmethod
     def from_filename(cls, filename):
-        basename, ftype, _ = filename.split('.')
-
-        program = basename.split('/')[-3]
+        basename, ftype, __ = filename.split('.')
 
         dataset = basename.split('/')[-2]
 
@@ -81,7 +80,7 @@ class Handle(object):
 
         model = info.split('_')[-1]
 
-        obj = cls(epochs, batch_size, filters, filter_size, dataset=dataset, model=model, ftype=ftype, program=program)
+        obj = cls(epochs, batch_size, filters, filter_size, dataset=dataset, model=model, ftype=ftype)
 
         return obj
 

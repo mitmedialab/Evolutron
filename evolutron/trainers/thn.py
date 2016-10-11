@@ -2,9 +2,9 @@
 from __future__ import print_function
 
 import time
+import os
 from collections import OrderedDict, defaultdict
 from functools import reduce
-from itertools import izip
 
 import lasagne
 import numpy as np
@@ -211,7 +211,7 @@ class DeepTrainer:
                         err, acc = self.train_fn(X, y)
                         train_err.append(err)
                         train_acc.append(acc)
-                    except MemoryError:
+                    except ValueError:
                         print(X[0].shape)
                         pass
                     # print (self.f(X))
@@ -526,6 +526,8 @@ class DeepTrainer:
         handle.epochs = len(self.train_err_mem)
 
         filename = 'models/' + handle
+        if not os.path.exists('/'.join(filename.split('/')[:-1])):
+            os.makedirs('/'.join(filename.split('/')[:-1]))
 
         params = self.get_all_param_values()
 
@@ -540,7 +542,11 @@ class DeepTrainer:
         assert (not self.train_err_mem == [])
         handle.ftype = 'history'
         handle.epochs = len(self.train_err_mem)
+
         filename = 'models/' + handle
+        if not os.path.exists('/'.join(filename.split('/')[:-1])):
+            os.makedirs('/'.join(filename.split('/')[:-1]))
+
         np.savez_compressed(filename,
                             train_err_mem=self.train_err_mem, val_err_mem=self.val_err_mem,
                             train_acc_mem=self.train_acc_mem, val_acc_mem=self.val_acc_mem,

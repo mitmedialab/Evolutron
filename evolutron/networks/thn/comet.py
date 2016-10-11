@@ -99,59 +99,52 @@ class CoDER:
 
 
 class DeepCoDER:
-    def __init__(self, pad_size, filters, filter_size):
+    def __init__(self, pad_size, batch_size, conv_layers, fc_layers, filters, filter_size):
         self.inp = {'aa_seq': ten.tensor3('aa_seq', dtype=theano.config.floatX)}
         self.targets = {'aa_seq': ten.tensor3('aa_rec_seq', dtype=theano.config.floatX)}
 
         self.pad_size = pad_size
+        self.batch_size = batch_size
         self.filters = filters
         self.filter_size = filter_size
+        self.conv_layers = conv_layers
+        self.fc_layers = fc_layers
 
         self.layers = self.build_network()
 
         self.network = self.layers['output']
 
-        self.handle = 'CoDER_test'
+        self.handle = 'DeepCoDER'
 
     def build_network(self):
         network = {'input': lasagne.layers.InputLayer(input_var=self.inp['aa_seq'],
-                                                      shape=(None, 20, self.pad_size),
+                                                      shape=(self.batch_size, 20, self.pad_size),
                                                       name='Input')}
 
-        # Convolutional layer with M motifs of size m.
         network['conv1'] = lasagne.layers.Conv1DLayer(network['input'],
                                                       num_filters=self.filters,
                                                       filter_size=self.filter_size,
-                                                      flip_filters=False,
-                                                      nonlinearity=None,
+                                                      flip_filters=True,
+                                                      nonlinearity=lasagne.nonlinearities.rectify,
                                                       W=lasagne.init.GlorotUniform('relu'),
-                                                      stride=self.filter_size - 2,
-                                                      pad='valid',
+                                                      stride=1,
+                                                      pad='same',
                                                       name='Conv1')
+        for i in range(1, self.conv_layers):
+            # Convolutional layer with M motifs of size m.
+            network['conv' + str(i + 1)] = lasagne.layers.Conv1DLayer(network['conv' + str(i)],
+                                                                      num_filters=self.filters,
+                                                                      filter_size=self.filter_size,
+                                                                      flip_filters=True,
+                                                                      nonlinearity=lasagne.nonlinearities.rectify,
+                                                                      W=lasagne.init.GlorotUniform('relu'),
+                                                                      stride=1,
+                                                                      pad='same',
+                                                                      name='Conv' + str(i + 1))
 
-        network['conv2'] = lasagne.layers.Conv1DLayer(network['conv1'],
-                                                      num_filters=self.filters,
-                                                      filter_size=self.filter_size,
-                                                      flip_filters=False,
-                                                      nonlinearity=None,
-                                                      W=lasagne.init.GlorotUniform('relu'),
-                                                      stride=self.filter_size - 2,
-                                                      pad='valid',
-                                                      name='Conv2')
-
-        network['conv3'] = lasagne.layers.Conv1DLayer(network['conv2'],
-                                                      num_filters=self.filters,
-                                                      filter_size=self.filter_size,
-                                                      flip_filters=False,
-                                                      nonlinearity=None,
-                                                      W=lasagne.init.GlorotUniform('relu'),
-                                                      stride=self.filter_size - 2,
-                                                      pad='valid',
-                                                      name='Conv3')
-
-        network['conv_non_lin'] = lasagne.layers.NonlinearityLayer(network['conv3'],
-                                                                   nonlinearity=lasagne.nonlinearities.rectify,
-                                                                   name='nonlin')
+        # network['conv_non_lin'] = lasagne.layers.NonlinearityLayer(network['conv3'],
+        #                                                            nonlinearity=lasagne.nonlinearities.rectify,
+        #                                                            name='nonlin')
 
         # Max-pooling layer to select best motif score for each motif.
 
@@ -159,37 +152,40 @@ class DeepCoDER:
         #                                                    pool_size=100,
         #                                                    stride=1,
         #                                                    name='MaxPool')
-        network['maxpool'] = lasagne.layers.GlobalPoolLayer(network['conv_non_lin'],
+        network['maxpool'] = lasagne.layers.GlobalPoolLayer(network['conv' + str(self.conv_layers)],
                                                             pool_function=ten.max,
                                                             name='MaxPool')
 
-        network['FC1'] = lasagne.layers.DenseLayer(network['maxpool'],
-                                                   num_units=self.filters,
-                                                   nonlinearity=lasagne.nonlinearities.sigmoid,
-                                                   name='FC1')
+        network['hidden'] = lasagne.layers.DenseLayer(network['maxpool'],
+                                                      num_units=50,
+                                                      nonlinearity=lasagne.nonlinearities.sigmoid,
+                                                      name='Hidden')
 
-        network['inv_FC1'] = lasagne.layers.InverseLayer(network['FC1'], network['FC1'], name='inv_hidden')
+        network['inv_hidden'] = lasagne.layers.InverseLayer(network['hidden'], network['hidden'], name='InvHidden')
 
-        network['inv_pool'] = lasagne.layers.InverseLayer(network['inv_FC1'], network['maxpool'], name='inv_pool')
+        network['unpool'] = lasagne.layers.InverseLayer(network['inv_hidden'], network['maxpool'], name='Unpool')
 
-        network['inv_conv3'] = lasagne.layers.InverseLayer(network['inv_pool'], network['conv3'], name='inv_conv3')
+        network['deconv' + str(self.conv_layers)] = lasagne.layers.InverseLayer(network['unpool'],
+                                                                                network['conv' + str(self.conv_layers)],
+                                                                                name='DeConv' + str(self.conv_layers))
 
-        network['inv_conv2'] = lasagne.layers.InverseLayer(network['inv_conv3'], network['conv2'], name='inv_conv2')
+        for i in range(self.conv_layers - 1, 0, -1):
+            network['deconv' + str(i)] = lasagne.layers.InverseLayer(network['deconv' + str(i + 1)],
+                                                                     network['conv' + str(i)],
+                                                                     name='DeConv' + str(i))
 
-        network['inv_conv1'] = lasagne.layers.InverseLayer(network['inv_conv2'], network['conv1'], name='inv_conv1')
-
-        network['output'] = network['inv_conv1']
+        network['output'] = network['deconv1']
 
         return network
 
     def build_loss(self, deterministic=False):
         prediction = lasagne.layers.get_output(self.network, deterministic=deterministic)
 
-        code_dist = prediction.dimshuffle((0, 2, 1)).reshape((prediction.shape[0] * prediction.shape[2], 20))
-
-        true_dist = ten.argmax(
-            self.targets['aa_seq'].dimshuffle((0, 2, 1))
-                .reshape((self.targets['aa_seq'].shape[0] * self.targets['aa_seq'].shape[2], 20)), axis=1)
+        # code_dist = prediction.dimshuffle((0, 2, 1)).reshape((prediction.shape[0] * prediction.shape[2], 20))
+        #
+        # true_dist = ten.argmax(
+        #     self.targets['aa_seq'].dimshuffle((0, 2, 1))
+        #         .reshape((self.targets['aa_seq'].shape[0] * self.targets['aa_seq'].shape[2], 20)), axis=1)
 
         # loss = lasagne.objectives.categorical_crossentropy(code_dist, true_dist)
         loss = lasagne.objectives.squared_error(prediction, self.targets['aa_seq'])

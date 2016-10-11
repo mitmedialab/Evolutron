@@ -2,8 +2,12 @@
 """Define the tools top level"""
 from __future__ import absolute_import, print_function, division
 
-from .data_tools import *
-from .seq_tools import *
-from .utils import *
+from .data_tools import data_it, load_dataset
+
+from .seq_tools import (hot2aa, aa2hot, nt2prob, prob2nt,
+                        aa_map, aa_map_rev, nt_map)
+
+from .utils import shape, none2str, probability, Handle
+
 from .visual import (plot_loss_history)
 
