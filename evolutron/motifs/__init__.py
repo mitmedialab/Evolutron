@@ -1,1 +1,1 @@
-from extraction import motif_extraction
+from .extraction import motif_extraction

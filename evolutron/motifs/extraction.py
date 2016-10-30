@@ -30,26 +30,21 @@ class Motif(object):
 
 
 # noinspection PyShadowingNames
-def motif_extraction(motif_fun, x_data, handle, depth=1, filters=None, filter_size=None):
-    foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth)
+def motif_extraction(motif_fun, x_data, filters, filter_length, handle, depth):
+    foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth + 1)
     if not os.path.exists(foldername):
         os.makedirs(foldername)
 
-    if not filters:
-        filters = np.squeeze(motif_fun([x_data[0]]), 0).shape[0]
-    if not filter_size:
-        filter_size = x_data[0].shape[1] - np.squeeze(motif_fun([x_data[0]]), 0).shape[1] + 1
-
     # Filter visual field
-    vf = filter_size + depth * (filter_size - 1)
+    vf = filter_length + depth * (filter_length - 1)
 
-    max_seq_scores = []
     # Calculate the activations for each filter for each protein in data set
+    max_seq_scores = []
     for x_part in data_it(x_data, 5000):
-        seq_scores = iter(np.squeeze(motif_fun([y]), 0) for y in x_part)
+        seq_scores = [np.squeeze(motif_fun([[y]]), 0) for y in x_part]
 
         # For every filter, keep max and argmax for each input protein
-        max_seq_scores.append(np.asarray([np.vstack((np.max(x, 1), np.argmax(x, 1))) for x in seq_scores]))
+        max_seq_scores.append(np.asarray([np.vstack((np.max(x, 0), np.argmax(x, 0))) for x in seq_scores]))
 
         del seq_scores
 
@@ -69,8 +64,10 @@ def motif_extraction(motif_fun, x_data, handle, depth=1, filters=None, filter_si
 
     del max_seq_scores
 
+    print([len(m) for m in matches])
+
     motifs = generate_motifs(matches)
-    print('Extracted {0} motifs'.format(len(motifs)))
+    print('Extracted {0} motifs'.format(len([1 for m in motifs if m])))
 
     generate_logos(motifs, foldername)
     print("Generating Sequence Logos")
@@ -85,6 +82,8 @@ def generate_motifs(matches):
             motif = Motif(match)
             if motif.is_good():
                 motifs.append(motif)
+            else:
+                motifs.append(None)
     return motifs
 
 
@@ -94,18 +93,18 @@ def generate_logos(motifs, foldername):
     options.color_scheme = wl.std_color_schemes["chemistry"]
 
     for i, motif in enumerate(motifs):
-        my_format = wl.LogoFormat(motif.data, options)
-        # my_png = wl.png_print_formatter(motif.data, my_format)
-        my_pdf = wl.pdf_formatter(motif.data, my_format)
-        # foo = open(foldername + '/' + str(i) + ".png", "w")
-        # foo.write(my_png)
-        # foo.close()
-        foo = open(foldername + str(i) + ".pdf", "w")
-        foo.write(my_pdf)
-        foo.close()
-        foo = open(foldername + str(i) + ".txt", "w")
-        for seq in motif.seqs:
-            foo.write("%s\n" % str(seq))
-        foo.close()
-
+        if motif:
+            my_format = wl.LogoFormat(motif.data, options)
+            # my_png = wl.png_print_formatter(motif.data, my_format)
+            my_pdf = wl.pdf_formatter(motif.data, my_format)
+            # foo = open(foldername + '/' + str(i) + ".png", "w")
+            # foo.write(my_png)
+            # foo.close()
+            foo = open(foldername + str(i) + ".pdf", "w")
+            foo.write(my_pdf)
+            foo.close()
+            # foo = open(foldername + str(i) + ".txt", "w")
+            # for seq in motif.seqs:
+            #     foo.write("%s\n" % str(seq))
+            # foo.close()
     return

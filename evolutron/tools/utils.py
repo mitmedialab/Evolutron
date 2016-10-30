@@ -70,8 +70,10 @@ class Handle(object):
 
     @classmethod
     def from_filename(cls, filename):
-        basename, ftype, __ = filename.split('.')
-
+        try:
+            basename, ftype, __ = filename.split('.')
+        except ValueError:
+            basename, ftype = filename.split('.')
         dataset = basename.split('/')[-2]
 
         info = basename.split('/')[-1]

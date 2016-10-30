@@ -6,65 +6,25 @@ import time
 from collections import OrderedDict, defaultdict
 
 import numpy as np
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
+from keras.optimizers import SGD
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from tabulate import tabulate
 
-
 # TODO: implement enhanced progbar logger
-# class ProgbarLogger(Callback):
-#     '''Callback that prints metrics to stdout.
-#     '''
-#     def on_train_begin(self, logs={}):
-#         self.verbose = self.params['verbose']
-#         self.nb_epoch = self.params['nb_epoch']
-#
-#     def on_epoch_begin(self, epoch, logs={}):
-#         if self.verbose:
-#             print('Epoch %d/%d' % (epoch + 1, self.nb_epoch))
-#             self.progbar = Progbar(target=self.params['nb_sample'],
-#                                    verbose=self.verbose)
-#         self.seen = 0
-#
-#     def on_batch_begin(self, batch, logs={}):
-#         if self.seen < self.params['nb_sample']:
-#             self.log_values = []
-#
-#     def on_batch_end(self, batch, logs={}):
-#         batch_size = logs.get('size', 0)
-#         self.seen += batch_size
-#
-#         for k in self.params['metrics']:
-#             if k in logs:
-#                 self.log_values.append((k, logs[k]))
-#
-#         # skip progbar update for the last batch;
-#         # will be handled by on_epoch_end
-#         if self.verbose and self.seen < self.params['nb_sample']:
-#             self.progbar.update(self.seen, self.log_values)
-#
-#     def on_epoch_end(self, epoch, logs={}):
-#         for k in self.params['metrics']:
-#             if k in logs:
-#                 self.log_values.append((k, logs[k]))
-#         if self.verbose:
-#             self.progbar.update(self.seen, self.log_values, force=True)
-#
-#
 
 
 class DeepTrainer:
     def __init__(self,
-                 net,
+                 network,
                  classification=False,
                  verbose=False,
                  patience=True):
 
         self.verbose = verbose
 
-        self.net = net
-        self.inp = net.inp
-        self.network = net.network
+        self.network = network
+        self.inp = network.input
 
         self.classification = classification
 
@@ -84,9 +44,15 @@ class DeepTrainer:
 
         self._funcs_init = False
 
-    def compile(self):
-        self.network.compile(loss=self.net.loss,
-                             optimizer=self.net.optimizer)
+    def compile(self, optimizer, **options):
+
+        if optimizer == 'sgd':
+            optimizer = SGD(lr=options.pop('lr', .01),
+                            decay=1e-6, momentum=0.9, nesterov=True)
+
+        self.network.compile(loss=self.network._loss_function,
+                             optimizer=optimizer,
+                             metrics=[self.network.mean_cat_acc])
         self._create_functions()
 
     def _create_functions(self):
@@ -99,37 +65,8 @@ class DeepTrainer:
 
         self._funcs_init = True
 
-    def motif_fun(self):
-
-        # inputs = self.inp.values()
-        #
-        # conv_scores = lasagne.layers.get_output(self.get_last_conv_layer())
-        #
-        # return theano.function(inputs, conv_scores)
-        raise NotImplementedError
-
-    # @staticmethod
-    # def _iterate_minibatches(X, y, batch_size):
-    #     assert len(X) == len(y)
-    #
-    #     if batch_size == 1:
-    #         for idx in range(0, len(X)):
-    #             yield [X[idx]], [y[idx]]
-    #     else:
-    #         for start_idx in range(0, len(X), batch_size):
-    #             excerpt = slice(start_idx, min(start_idx + batch_size, len(X)))
-    #             yield X[excerpt], y[excerpt]  # TODO: yield excerpt
-    #
-    # @staticmethod
-    # def _iterate_huge(X, y, block_size):
-    #     # TODO: here will implement shared variable storage and pass indexes
-    #     assert len(X) == len(y)
-    #
-    #     for start_idx in range(0, len(X), block_size):
-    #         excerpt = slice(start_idx, min(start_idx + block_size, len(X)))
-    #         yield X[excerpt], y[excerpt]
-
-    def fit(self, x_data, y_data, epochs=1, batch_size=64, shuffle=True, validate=.0, patience=10000):
+    def fit(self, x_data, y_data, nb_epoch=1, batch_size=64, shuffle=True, validate=.0, patience=10,
+            return_best_model=True):
         assert (validate >= 0)
         assert self._funcs_init
         # TODO: if dataset is big
@@ -158,111 +95,37 @@ class DeepTrainer:
                            stralign='center',
                            headers="firstrow"))
 
-        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=0, mode='auto')
+        # Callbacks
+        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                                      patience=patience / 2, min_lr=0.001)
+        rn = np.random.random()
+        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
+                                     save_best_only=True, save_weights_only=True)
 
+        start_time = time.time()
         self.network.fit(x_train, y_train,
                          validation_data=(x_valid, y_valid),
                          shuffle=shuffle,
-                         nb_epoch=epochs,
+                         nb_epoch=nb_epoch,
                          batch_size=batch_size,
-                         callbacks=[es])
+                         callbacks=[es, reduce_lr, checkpoint]
+                         )
 
-        self.history = self.network.history.history
+        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(nb_epoch, time.time() - start_time))
+        if return_best_model:
+            self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
 
-        self.train_loss = self.history['loss']
+        self.history = self.network.history
+
+        self.train_loss = self.history.history['loss']
         if validate > 0:
-            self.valid_loss = self.history['val_loss']
+            self.valid_loss = self.history.history['val_loss']
 
         if self.classification:
-            self.train_acc = self.history['acc']
+            self.train_acc = self.history.history['acc']
             if validate > 0:
-                self.valid_acc = self.history['val_acc']
-
-        # epoch = 0
-        # start_time = time.time()
-        # print(tabulate([['Epoch', 'Train Loss', 'Train Acc', 'Val Loss', 'Val Acc', 'Time']], stralign='center',
-        #                headers="firstrow"))
-        # # We iterate over epochs:
-        # try:
-        #     while epoch < epochs and not done_looping:
-        #         epoch += 1
-        #
-        #         # In each epoch, we do a full pass over the training data:
-        #         train_err = []
-        #         train_acc = []
-        #         epoch_time = time.time()
-        #         # count=0
-        #
-        #         for X, y in self._iterate_minibatches(train_set_x, train_set_y, self.batch_size):
-        #
-        #             try:
-        #                 err, acc = self.train_fn(X, y)
-        #                 train_err.append(err)
-        #                 train_acc.append(acc)
-        #             except MemoryError:
-        #                 print(X[0].shape)
-        #                 pass
-        #                 # print (self.f(X))
-        #                 # print(pred)
-        #                 # print(targ)
-        #                 # print(pred.shape)
-        #                 # print(targ.shape)
-        #                 # count += 1
-        #                 # print(count)
-        #
-        #         # After that, we do a full pass over the validation data:
-        #         val_err = []
-        #         val_acc = []
-        #         for X, y in self._iterate_minibatches(valid_set_x, valid_set_y, self.batch_size):
-        #             try:
-        #                 err, acc = self.val_fn(X, y)
-        #                 val_err.append(err)
-        #                 val_acc.append(acc)
-        #             except MemoryError:
-        #                 print(X[0].shape)
-        #                 pass
-        #
-        #         self.train_err_mem.append(np.mean(train_err))
-        #         self.train_acc_mem.append(100 * np.mean(train_acc))
-        #         if validate > 0:
-        #             self.val_err_mem.append(np.mean(val_err))
-        #             self.val_acc_mem.append(100 * np.mean(val_acc))
-        #         else:
-        #             self.val_err_mem.append('-')
-        #             self.val_acc_mem.append('-')
-        #
-        #         print(tabulate([['Epoch', 'Train Loss', 'Train Acc', 'Val Loss', 'Val Acc', 'Time'],
-        #                         ["{}/{}".format(epoch, epochs),
-        #                          self.train_err_mem[-1], self.train_acc_mem[-1],
-        #                          self.val_err_mem[-1], self.val_acc_mem[-1],
-        #                          "{:.3f}s".format(time.time() - epoch_time)]],
-        #                        tablefmt='plain', floatfmt=".6f", stralign='center',
-        #                        headers="firstrow").rsplit('\n', 1)[-1])
-        #
-        #         # If we have the best validation score until now
-        #         if self.val_err_mem[-1] < best_validation_loss:
-        #
-        #             # Increase patience if loss improvement is good enough
-        #             if self.val_err_mem[-1] < best_validation_loss * improvement_threshold:
-        #                 patience = max(patience, it * patience_increase)
-        #
-        #             # save best validation score and iteration number
-        #             best_validation_loss = self.val_err_mem[-1]
-        #
-        #         # print(self.get_all_param_values())
-        #
-        #         # Stop if above early stopping limit
-        #         it = (epoch - 1) * len(train_set_x)
-        #         if patience <= it and self.patience:
-        #             done_looping = True
-        # except KeyboardInterrupt:
-        #     print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(epoch, time.time() - start_time))
-        #     ct = time.ctime()
-        #     self.save_train_history('stopped_{0}'.format(ct))
-        #     self.save_model_to_file('stopped_{0}'.format(ct))
-        #     exit(0)
-
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(epoch, time.time() - start_time))
+                self.valid_acc = self.history.history['val_acc']
 
     def k_fold(self, x_data, y_data, epochs=1, num_folds=10, stratify=False):
 
@@ -380,20 +243,14 @@ class DeepTrainer:
             self.k_fold_history['val_preds'].append(val_preds)
             self.reset_all_param_values()
 
-    def score(self, X, y):
-        self._create_functions()
-        # test_err = []
-        # test_acc = []
-        # for X, y in self._iterate_minibatches(X, y, self.batch_size):
-        #     err, acc = self.val_fn(X, y)
-        #     test_err.append(err)
-        #     test_acc.append(acc)
-        #
-        # return np.mean(test_err), 100 * np.mean(test_acc)
-        raise NotImplementedError
+    def score(self, x_data, y_data, **options):
+        raise self.network.evaluate(x_data, y_data, **options)
 
-    def predict_proba(self, X):
-        raise NotImplementedError
+    def predict_proba(self, x_data):
+        raise self.network.predict_proba(x_data)
+
+    def predict_classes(self, x_data):
+        raise self.network.predict_classes(x_data)
 
     def predict(self, x_data):
         return self.network.predict(x_data)
@@ -414,6 +271,8 @@ class DeepTrainer:
 
         print(tabulate(tabula, 'keys'))
 
+        self.network.summary()
+
     def get_all_layers(self):
         return self.network.layers
 
@@ -432,19 +291,35 @@ class DeepTrainer:
 
     def set_all_param_values(self, weights):
         try:
-            self.network.get_weights(weights)
+            self.network.set_weights(weights)
         except Exception:
             msg = 'Incorrect parameter list'
             raise ValueError(msg)
 
+    def load_all_param_values(self, filepath):
+        try:
+            self.network.load_weights(filepath)
+        except Exception:
+            msg = 'Incorrect parameter list'
+            raise ValueError(msg)
+
+    def get_conv_layers(self):
+        try:
+            return [x for x in self.get_all_layers() if x.name.find('Conv') == 0]
+        except:
+            raise AttributeError("Model has no convolutional layers.")
+
     def get_last_conv_layer(self):
         try:
-            return [x for x in self.get_all_layers() if x.name.find('Conv') > -1][-1]
+            return [x for x in self.get_all_layers() if x.name.find('Conv') == 0][-1]
         except:
             raise AttributeError("Model has no convolutional layers.")
 
     def get_conv_param_values(self):
-        raise NotImplementedError
+        try:
+            return [x.get_weights() for x in self.get_all_layers() if x.name.find('Conv') == 0]
+        except:
+            raise AttributeError("Model has no convolutional layers.")
 
     def set_conv_param_values(self, source):
 
@@ -478,7 +353,7 @@ class DeepTrainer:
     def save_model_to_file(self, handle):
 
         handle.ftype = 'model'
-        handle.epochs = len(self.train_loss)  # TODO: is this the best way ?
+        handle.epochs = len(self.history.epoch)
 
         filename = 'models/' + handle
         if not os.path.exists('/'.join(filename.split('/')[:-1])):
@@ -486,36 +361,26 @@ class DeepTrainer:
 
         self.network.save(filename)
 
-        return 'Model saved in:' + filename
+        print('Model saved in:' + filename)
 
     def load_model_from_file(self, filename):
-        self.network.load(filename)
+        self.network = self.network.__class__.from_saved_model(filename)
+        self.history = self.network.history
 
-        # def save_train_history(self, handle):
-        #     assert (not self.train_err_mem == [])
-        #     handle.ftype = 'history'
-        #     handle.epochs = len(self.train_err_mem)
-        #
-        #     filename = 'models/' + handle
-        #     if not os.path.exists('/'.join(filename.split('/')[:-1])):
-        #         os.makedirs('/'.join(filename.split('/')[:-1]))
-        #
-        #     np.savez_compressed(filename,
-        #                         train_err_mem=self.train_err_mem, val_err_mem=self.val_err_mem,
-        #                         train_acc_mem=self.train_acc_mem, val_acc_mem=self.val_acc_mem,
-        #                         val_prc_auc_mem=self.val_prc_auc_mem, val_roc_auc_mem=self.val_roc_auc_mem)
-        #
-        # def load_train_history(self, filename):
-        #     assert (self.train_err_mem == [])
-        #     filename += '.history.npz'
-        #     with np.load(filename) as f:
-        #         self.train_err_mem = f['train_err_mem'].tolist()
-        #         self.train_acc_mem = f['train_acc_mem'].tolist()
-        #         self.val_err_mem = f['val_err_mem'].tolist()
-        #         self.val_acc_mem = f['val_acc_mem'].tolist()
-        #         self.val_prc_auc_mem = f['val_prc_auc_mem'].tolist()
-        #         self.val_roc_auc_mem = f['val_roc_auc_mem'].tolist()
-        #
+    def save_train_history(self, handle):
+        assert (not self.train_loss == [])
+        handle.ftype = 'history'
+        handle.epochs = len(self.train_loss)
+
+        filename = 'models/' + handle
+        if not os.path.exists('/'.join(filename.split('/')[:-1])):
+            os.makedirs('/'.join(filename.split('/')[:-1]))
+
+        np.savez_compressed(filename,
+                            train_loss=self.train_loss, val_loss=self.valid_loss,
+                            train_acc=self.train_acc, val_acc_mem=self.valid_acc)
+        # val_prc_auc_mem=self.val_prc_auc_mem, val_roc_auc_mem=self.val_roc_auc_mem)
+
         # def save_kfold_history(self, filename):
         #     assert (not self.fold_train_losses[0, 0] == .0)
         #     filename_ = filename + '.k_fold'
