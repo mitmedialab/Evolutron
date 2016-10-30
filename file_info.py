@@ -10,18 +10,23 @@ def folder_info(foldername):
     import pandas as pd
     import glob
 
-    h_files = glob.glob(foldername + '/*.history.npz')
+    h_files = glob.glob(foldername + '/*CoDERwCross.history.npz')
 
     opt_matrix = []
 
     for f in h_files:
         handle = Handle.from_filename(f)
 
-        with np.load(f) as data:
-            val_acc_mem = data['val_acc_mem']
-            train_acc_mem = data['train_acc_mem']
+        try:
+            with np.load(f) as data:
+                val_loss = data['val_loss']
+                train_loss = data['train_loss']
+        except KeyError:
+            with np.load(f) as data:
+                val_loss = data['val_acc_mem']
+                train_loss = data['train_acc_mem']
 
-        opt_matrix.append((handle.filter_size, handle.filters, train_acc_mem[-1], val_acc_mem[-1]))
+        opt_matrix.append((handle.filter_size, handle.filters, train_loss[-1], val_loss[-1]))
 
     opt_matrix = np.asarray(opt_matrix)
 
@@ -66,7 +71,7 @@ def folder_info(foldername):
 
 
 def main(filename, **options):
-    import evolutron.networks.thn as nets
+    import evolutron.networks.las as nets
     from evolutron.trainers.thn import DeepTrainer
 
     if '.fasta' in filename:

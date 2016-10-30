@@ -1,7 +1,5 @@
 # coding=utf-8
 """Define the tools top level"""
-from __future__ import absolute_import, print_function, division
-
 from .data_tools import data_it, load_dataset
 
 from .seq_tools import (hot2aa, aa2hot, nt2prob, prob2nt,

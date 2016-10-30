@@ -59,6 +59,7 @@ database = {
 # -------- Functions ------- #
 ############################
 
+
 def count_lines(f):
     """ Counts the lines of large files by blocks.
     """
@@ -268,15 +269,26 @@ def tab_parser(data_id, padded=True, min_aa=None, max_aa=None):
 
         raw_data.to_hdf(filename[:-3] + 'h5', 'table')
 
-    x_data = raw_data['x_data'].tolist()
+    x_data = raw_data['x_data'].sample(frac=1).reset_index(drop=True).tolist()
+
+    # TODO: fix dimensions in aa2hot
+
+    x_data = [x.transpose() for x in x_data]
 
     if not padded:
         return x_data
 
     if not max_aa:
-        max_aa = max(x.shape[1] for x in x_data)
+        max_aa = max(x.shape[0] for x in x_data)
+    else:
+        max_aa = min(max_aa, max(x.shape[0] for x in x_data))
 
-    dataset = np.asarray([np.pad(x, pad_width=((0, 0), (0, max_aa - x.shape[1])),
-                                 mode='constant', constant_values=0) for x in x_data])
+    def pad_or_clip(x, n):
+        if n >= x.shape[0]:
+            return np.pad(x, pad_width=((0, n - x.shape[0]), (0, 0)), mode='constant', constant_values=0)
+        else:
+            return x[:n, :]
+
+    dataset = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
 
     return dataset
