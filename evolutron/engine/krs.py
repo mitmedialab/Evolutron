@@ -46,15 +46,15 @@ class DeepTrainer:
 
     def compile(self, optimizer, **options):
 
-        opts = {'sgd': opt.SGD(lr=options.pop('lr', .01),
-                               decay=options.pop('decay', 1e-6),
-                               momentum=options.pop('momentum', 0.9), nesterov=True),
-                'rmsprop': opt.RMSprop(lr=options.pop('lr', .001)),
-                'adadelta': opt.Adadelta(lr=options.pop('lr', 1.)),
-                'adagrad': opt.Adagrad(lr=options.pop('lr', .01)),
-                'adam': opt.Adam(lr=options.pop('lr', .001)),
-                'nadam': opt.Nadam(lr=options.pop('lr', .002)),
-                'adamax': opt.Adamax(lr=options.pop('lr', .002))
+        opts = {'sgd': opt.SGD(lr=options.get('lr', .01),
+                               decay=options.get('decay', 1e-6),
+                               momentum=options.get('momentum', 0.9), nesterov=True),
+                'rmsprop': opt.RMSprop(lr=options.get('lr', .001)),
+                'adadelta': opt.Adadelta(lr=options.get('lr', 1.)),
+                'adagrad': opt.Adagrad(lr=options.get('lr', .01)),
+                'adam': opt.Adam(lr=options.get('lr', .001)),
+                'nadam': opt.Nadam(lr=options.get('lr', .002)),
+                'adamax': opt.Adamax(lr=options.get('lr', .002))
                 }
 
         self.network.compile(loss=self.network._loss_function,
