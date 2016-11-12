@@ -1,4 +1,5 @@
 # coding=utf-8
+import numpy as np
 
 
 def none2str(s):
@@ -8,41 +9,48 @@ def none2str(s):
 
 
 def shape(x):
-    try:
-        return x.shape
-    except AttributeError:
+    if not x:
         return None
+    elif type(x) == np.ndarray:
+        return x.shape
+    elif type(x) == list and type(x[0]) == np.ndarray:
+        return (len(x),) + x[0].shape
+    elif type(x) == list:
+        return len(x),
 
 
-# TODO: make function that transforms a model from tf to theano and the opposite
-# .model.np -> .saver & summaries
+def probability(x):
+    import argparse
+    x = float(x)
+    if x < 0.0 or x > 1.0:
+        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]" % (x,))
+    return x
 
 
 class Handle(object):
-    """ Handles names for loading saving different models.
+    """ Handles names for loading and saving different models.
     """
-    def __init__(self, epochs=None,
+
+    def __init__(self,
+                 epochs=None,
                  batch_size=None,
                  filters=None,
-                 filter_size=None,
+                 filter_length=None,
                  model=None,
                  ftype=None,
                  program=None,
-                 dataset=None,
-                 extra=None):
+                 data_id=None):
         self.epochs = epochs
         self.batch_size = batch_size
         self.filters = filters
-        self.filter_size = filter_size
+        self.filter_size = filter_length
 
         self.model = model
         self.ftype = ftype
         self.program = program
-        self.dataset = dataset
+        self.dataset = data_id
 
         self.filename = str(self).split('/')[-1]
-
-        self.extra = extra
 
     def __str__(self):
         return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
@@ -85,11 +93,3 @@ class Handle(object):
         obj = cls(epochs, batch_size, filters, filter_size, dataset=dataset, model=model, ftype=ftype)
 
         return obj
-
-
-def probability(x):
-    import argparse
-    x = float(x)
-    if x < 0.0 or x > 1.0:
-        raise argparse.ArgumentTypeError("%r not in range [0.0, 1.0]" % (x,))
-    return x

@@ -4,8 +4,7 @@
 """
 from collections import OrderedDict
 
-import tensorflow as tf
-from evolutron.tools.net_tools import *
+from evolutron.networks.tnf.net_tools import *
 
 """
     Implementation of a Convolutional protein Motif Extraction Tool (CoMET) in Tensorflow.

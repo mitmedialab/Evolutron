@@ -1,15 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+from __future__ import division
 
 import os
 import time
 from collections import OrderedDict, defaultdict
 
-import numpy as np
-from keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
-import keras.optimizers as opt
-from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from tabulate import tabulate
+import numpy as np
+
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ReduceLROnPlateau
+from keras.callbacks import ModelCheckpoint
+import keras.optimizers as opt
+
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 
 # TODO: implement enhanced progbar logger
 
@@ -72,13 +77,16 @@ class DeepTrainer:
 
         self._funcs_init = True
 
+    def fit_generator(self):
+        # TODO: if dataset is big
+        # fit_generator(self, generator, samples_per_epoch, nb_epoch, verbose=1, callbacks=[], validation_data=None,
+        # nb_val_samples=None, class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False)
+        raise NotImplementedError
+
     def fit(self, x_data, y_data, nb_epoch=1, batch_size=64, shuffle=True, validate=.0, patience=10,
             return_best_model=True):
         assert (validate >= 0)
         assert self._funcs_init
-        # TODO: if dataset is big
-        # fit_generator(self, generator, samples_per_epoch, nb_epoch, verbose=1, callbacks=[], validation_data=None,
-        # nb_val_samples=None, class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False)
 
         if self.classification:
             x_train, x_valid, y_train, y_valid = train_test_split(x_data, y_data, test_size=validate, stratify=y_data)
@@ -122,7 +130,6 @@ class DeepTrainer:
         except KeyboardInterrupt:
             pass
 
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(nb_epoch, time.time() - start_time))
         if return_best_model:
             self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
 
@@ -136,6 +143,9 @@ class DeepTrainer:
             self.train_acc = self.history.history['acc']
             if validate > 0:
                 self.valid_acc = self.history.history['val_acc']
+
+        print(
+            'Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.train_loss), time.time() - start_time))
 
     def k_fold(self, x_data, y_data, epochs=1, num_folds=10, stratify=False):
 
@@ -371,7 +381,7 @@ class DeepTrainer:
 
         self.network.save(filename)
 
-        print('Model saved in:' + filename)
+        print('Model saved to: ' + filename)
 
     def load_model_from_file(self, filename):
         self.network = self.network.__class__.from_saved_model(filename)
@@ -390,6 +400,8 @@ class DeepTrainer:
                             train_loss=self.train_loss, val_loss=self.valid_loss,
                             train_acc=self.train_acc, val_acc_mem=self.valid_acc)
         # val_prc_auc_mem=self.val_prc_auc_mem, val_roc_auc_mem=self.val_roc_auc_mem)
+
+        print('History saved to: ' + filename)
 
         # def save_kfold_history(self, filename):
         #     assert (not self.fold_train_losses[0, 0] == .0)

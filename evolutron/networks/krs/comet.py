@@ -12,12 +12,11 @@
     liability.
 """
 import keras.backend as K
-from keras.layers import Input
-from keras.layers import Masking
 from keras.metrics import categorical_accuracy
 from keras.models import Model, load_model
 from keras.objectives import mean_squared_error
-
+from keras.layers import Input
+from keras.layers import Masking
 from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape  # To implement masking
 from .extra_layers import Dedense, Unpooling1D, Deconvolution1D
 
@@ -52,7 +51,7 @@ class DeepCoDER(Model):
 
         seq_length, alphabet = input_shape
 
-        # Input Layer
+        # Input LayerRO
         inp = Input(shape=input_shape, name='aa_seq')
 
         mask = Masking(mask_value=0.0)(inp)

@@ -1,2 +1,2 @@
-from .cohst_tf import *
+from .cohst import *
 from .dream_tf import *
