@@ -3,6 +3,18 @@ import numpy as np
 
 from evolutron.tools import io_tools as io
 
+file_db = {
+    'random': 'random_aa.fasta',
+    'type2p': '',
+    'c2h2': '',
+    'hsapiens': 'sprot_hsapiens_pfam.tsv',
+    'ecoli': 'sprot_ecoli_pfam.tsv',
+    'zinc': 'sprot_znf_prot_pfam.tsv',
+    'homeo': 'sprot_homeo_pfam.tsv',
+    'cd4': 'sprot_cd4_pfam.tsv',
+    'dnabind': 'sprot_dna_tf_pfam.tsv'
+}
+
 
 def data_it(dataset, block_size):
     """ Iterates through a large array, yielding chunks of block_size.
@@ -14,55 +26,48 @@ def data_it(dataset, block_size):
         yield dataset[excerpt]
 
 
-def load_dataset(data_id, **parser_options):
+def pad_or_clip(x, n):
+    if n >= x.shape[0]:
+        return np.concatenate((x[:n, :], np.zeros((n - x.shape[0], x.shape[1]))))
+    else:
+        return x[:n, :]
+
+
+def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
-
-    dataset = io.tab_parser(data_id, **parser_options)
-
+    print(padded)
     try:
-        assert type(dataset) == np.ndarray or type(dataset) == list
-    except AssertionError:
-        if data_id == 'type2p':
-            dataset, _ = io.type2p(**parser_options)
-        elif data_id == 't2pneb':
-            dataset = io.type2p(**parser_options)
-        elif data_id == 'c2h2':
-            dataset, _ = io.b1h(**parser_options)
-        elif data_id == 'b1h':
-            dataset = io.b1h(**parser_options)
-        elif data_id == 'swissprot':
-            dataset = io.fasta_parser('datasets/uniprot_sprot.fasta', **parser_options)
-        elif data_id == 'cas9':
-            dataset = io.fasta_parser('datasets/uniprot_cas9.fasta', **parser_options)
-        elif data_id == 'random':
-            dataset = io.fasta_parser('datasets/random_aa.fasta', **parser_options)
-        elif data_id == 'type2':
-            dataset = io.fasta_parser('datasets/uniprot_type2.fasta', **parser_options)
-        elif data_id == 'm6a':
-            dataset = io.m6a(**parser_options)
+        filename = file_db[data_id]
+        filetype = filename.split('.')[-1]
+    except KeyError:
+        raise IOError('Dataset id not in file database.')
+
+    if filetype == 'tsv':
+        x_data, y_data = io.tab_parser('datasets/' + filename, **parser_options)
+    elif filetype == 'fasta':
+        x_data, y_data = io.fasta_parser('datasets/' + filename, **parser_options)
+    else:
+        raise NotImplementedError('There is no parser for current file type.')
+
+    if padded:
+        if not max_aa:
+            max_aa = int(np.percentile([len(x) for x in x_data], 99))
         else:
-            print('Something went terribly wrong...')
-            return 1
+            max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
-    if len(dataset) > 2:
+        x_data = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
+
+    if not y_data:
         # Unsupervised Learning
-        # x: observations
-        x_data = dataset
+        # x_data: observations
 
-        # If sequences are padded, transform data list into a numpy array for mini-batching
-        if all(x.shape == x_data[0].shape for x in x_data):
-            x_data = np.asarray(x_data, dtype=np.float32)
-
-        print('Dataset size: {0}'.format(len(dataset)))
-
+        print('Dataset size: {0}'.format(len(x_data)))
         return x_data
-
-    elif len(dataset) == 2:
+    else:
         # Supervised Learning
-        # x: observations
-        # y: class labels
-        (x_data, y_data) = dataset
+        # x_data: observations
+        # y_data: class labels
         try:
             assert (len(x_data) == len(y_data))
         except AssertionError:
@@ -80,5 +85,3 @@ def load_dataset(data_id, **parser_options):
         print('Dataset size: {0}'.format(data_size))
 
         return x_data, y_data
-    else:
-        raise IOError("Dataset import fault.")

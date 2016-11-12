@@ -95,14 +95,12 @@ Transformations between representations
 
 
 def aa2hot(aa_seq):
-    num = [aa_map[aa] for aa in
-           aa_seq.replace('X', 'M').replace('Z', 'Q').replace('B', 'N').replace('U', 'S').replace('O', 'K')]
-
-    return np.eye(20, dtype=np.float32)[num].T
+    num = [aa_map[aa] for aa in aa_seq]
+    return np.eye(20, dtype=np.float32)[num]
 
 
 def hot2aa(hot):
-    num = [np.argmax(h) for h in hot.T]
+    num = [np.argmax(h) for h in hot]
 
     return ''.join([aa_map_rev[n] for n in num])
 

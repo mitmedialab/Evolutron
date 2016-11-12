@@ -6,8 +6,8 @@ except ImportError:
 import csv
 
 import numpy as np
-from Bio import SeqIO
 import pandas as pd
+from Bio import SeqIO
 
 from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot
 
@@ -44,22 +44,9 @@ class ZincFinger(Protein):
         return '{x.name} {x.nt_num} nt {x.aa_num} aa'.format(x=self)
 
 
-database = {
-    'type2p': '',
-    'c2h2': '',
-    'hsapiens': 'datasets/sprot_hsapiens_pfam',
-    'ecoli': 'datasets/sprot_ecoli_pfam',
-    'zinc': 'datasets/sprot_znf_prot_pfam',
-    'homeo': 'datasets/sprot_homeo_pfam',
-    'cd4': 'datasets/sprot_cd4_pfam',
-    'dnabind': 'datasets/sprot_dna_tf_pfam'
-}
-
-############################
+##############################
 # -------- Functions ------- #
-############################
-
-
+##############################
 def count_lines(f):
     """ Counts the lines of large files by blocks.
     """
@@ -215,7 +202,7 @@ def type2p(padded=False, min_aa=None, max_aa=None):
     return dataset
 
 
-def fasta_parser(filename, padded=False, min_aa=None, max_aa=None):
+def fasta_parser(filename, dummy_option=None):
     """
         This module parses data from FASTA files and transforms them to Evolutron format.
     """
@@ -224,71 +211,25 @@ def fasta_parser(filename, padded=False, min_aa=None, max_aa=None):
 
     aa_list = []
     for record in SeqIO.parse(input_file, "fasta"):
-
         seq = str(record.seq)
 
-        seq = seq.replace('X', 'M').replace('Z', 'Q').replace('B', 'N').replace('U', 'S').replace('O', 'K')
+        aa_list.append(seq)
 
-        if len(seq) < 1500:
-            aa_list.append(seq)
+    x_data = map(aa2hot, aa_list)
 
-    if padded:
-        if not max_aa:
-            max_aa = max(map(len, aa_list))
-        x_data = np.zeros((len(aa_list), 20, max(min_aa, max_aa)), dtype=np.float32)
-        for i, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                if j > max_aa - 1:
-                    break
-                x_data[i, int(aa_map[aa]), j] = 1
-    else:
-        if not max_aa:
-            max_aa = max(map(len, aa_list))
-        x_data = [np.zeros((20, min(max(len(aa_seq), min_aa), max_aa)), dtype=np.float32) for aa_seq in aa_list]
-
-        for ind, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                if j > max_aa - 1:
-                    break
-                x_data[ind][int(aa_map[aa]), j] = 1
-
-    dataset = x_data
-
-    return dataset
+    return x_data, None
 
 
-def tab_parser(data_id, padded=True, min_aa=None, max_aa=None):
+def tab_parser(filename, dummy_option=None):
     try:
-        raw_data = pd.read_hdf(database[data_id] + '.h5', 'table')
+        raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
     except IOError:
-        filename = database[data_id] + '.tsv'
-
         raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
+        raw_data.columns = raw_data.columns.str.strip().str.lower().str.replace(' ', '_')
+        raw_data.sequence = raw_data.sequence.str.replace('X', 'M'). \
+            str.replace('Z', 'Q').str.replace('B', 'N').str.replace('U', 'S').str.replace('O', 'K')
+        raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
 
-        raw_data['x_data'] = raw_data.Sequence.apply(aa2hot)
+    x_data = raw_data.sequence.apply(aa2hot).sample(frac=1).reset_index(drop=True).tolist()
 
-        raw_data.to_hdf(filename[:-3] + 'h5', 'table')
-
-    x_data = raw_data['x_data'].sample(frac=1).reset_index(drop=True).tolist()
-
-    # TODO: fix dimensions in aa2hot
-
-    x_data = [x.transpose() for x in x_data]
-
-    if not padded:
-        return x_data
-
-    if not max_aa:
-        max_aa = max(x.shape[0] for x in x_data)
-    else:
-        max_aa = min(max_aa, max(x.shape[0] for x in x_data))
-
-    def pad_or_clip(x, n):
-        if n >= x.shape[0]:
-            return np.pad(x, pad_width=((0, n - x.shape[0]), (0, 0)), mode='constant', constant_values=0)
-        else:
-            return x[:n, :]
-
-    dataset = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
-
-    return dataset
+    return x_data, None
