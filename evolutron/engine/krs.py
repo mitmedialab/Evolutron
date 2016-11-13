@@ -286,6 +286,7 @@ class DeepTrainer:
         names = [layer.name for layer in layers]
 
         shapes = ['x'.join(map(str, layer.output_shape[1:])) for layer in layers]
+        # TODO: maybe show weights shape also
 
         params = [layer.count_params() for layer in layers]
 
@@ -324,16 +325,10 @@ class DeepTrainer:
             raise ValueError(msg)
 
     def get_conv_layers(self):
-        try:
-            return [x for x in self.get_all_layers() if x.name.find('Conv') == 0]
-        except:
-            raise AttributeError("Model has no convolutional layers.")
+        return [x for x in self.get_all_layers() if x.name.find('Conv') == 0]
 
     def get_last_conv_layer(self):
-        try:
-            return [x for x in self.get_all_layers() if x.name.find('Conv') == 0][-1]
-        except:
-            raise AttributeError("Model has no convolutional layers.")
+        return [x for x in self.get_all_layers() if x.name.find('Conv') == 0][-1]
 
     def get_conv_param_values(self):
         try:
