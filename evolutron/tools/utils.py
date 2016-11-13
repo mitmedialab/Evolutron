@@ -39,7 +39,8 @@ class Handle(object):
                  model=None,
                  ftype=None,
                  program=None,
-                 data_id=None):
+                 data_id=None,
+                 **kwargs):
         self.epochs = epochs
         self.batch_size = batch_size
         self.filters = filters
@@ -90,6 +91,6 @@ class Handle(object):
 
         model = info.split('_')[-1]
 
-        obj = cls(epochs, batch_size, filters, filter_size, dataset=dataset, model=model, ftype=ftype)
+        obj = cls(epochs, batch_size, filters, filter_size, data_id=dataset, model=model, ftype=ftype)
 
         return obj

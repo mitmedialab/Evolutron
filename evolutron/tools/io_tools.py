@@ -215,7 +215,7 @@ def fasta_parser(filename, dummy_option=None):
 
         aa_list.append(seq)
 
-    x_data = map(aa2hot, aa_list)
+    x_data = list(map(aa2hot, aa_list))
 
     return x_data, None
 

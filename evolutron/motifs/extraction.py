@@ -12,9 +12,7 @@ from evolutron.tools import hot2aa, data_it
 
 
 class Motif(object):
-
     def __init__(self, seqs):
-
         self.seqs = SeqList(seqs)
 
         self.seqs.alphabet = wl.std_alphabets['protein']
@@ -23,10 +21,20 @@ class Motif(object):
 
         self.entropy = self.data.entropy
 
+    @property
     def is_good(self):
         if np.max(self.data.entropy) < 2.0:
             return False
         return True
+
+
+def filter_motif_extraction():
+    # p = (pwm - pwm.min(0)) / pwm.ptp(0)
+    # p_prob = p / p.sum(axis=0)
+    # data = wl.LogoData.from_counts(counts=p_prob.T, alphabet=wl.std_alphabets['protein'])
+    # my_format = wl.LogoFormat(data, options)
+    # my_png = wl.png_formatter(data, my_format)
+    raise NotImplementedError
 
 
 # noinspection PyShadowingNames
@@ -56,22 +64,20 @@ def motif_extraction(motif_fun, x_data, filters, filter_length, handle, depth):
         seq_mean = np.mean(filt[:, 0])
         # seq_mean = 0
         seq_std = np.std(filt[:, 0])
+        # seq_std = 0
         for i, seq in enumerate(filt):
             if seq[0] > seq_mean + 3 * seq_std:
                 j = int(seq[1])
-                if j + vf - 1 < x_data[i].shape[1]:
-                    matches[k].append(hot2aa(x_data[i][:, j:j + vf]))
+                if j + vf - 1 < x_data[i].shape[0]:
+                    matches[k].append(hot2aa(x_data[i][j:j + vf, :]))
 
     del max_seq_scores
-
-    print([len(m) for m in matches])
 
     motifs = generate_motifs(matches)
     print('Extracted {0} motifs'.format(len([1 for m in motifs if m])))
 
     generate_logos(motifs, foldername)
     print("Generating Sequence Logos")
-
     return
 
 
@@ -80,7 +86,7 @@ def generate_motifs(matches):
     for match in matches:
         if len(match) > 0:
             motif = Motif(match)
-            if motif.is_good():
+            if motif.is_good:
                 motifs.append(motif)
             else:
                 motifs.append(None)
@@ -88,7 +94,6 @@ def generate_motifs(matches):
 
 
 def generate_logos(motifs, foldername):
-
     options = wl.LogoOptions()
     options.color_scheme = wl.std_color_schemes["chemistry"]
 
@@ -100,7 +105,7 @@ def generate_logos(motifs, foldername):
             # foo = open(foldername + '/' + str(i) + ".png", "w")
             # foo.write(my_png)
             # foo.close()
-            foo = open(foldername + str(i) + ".pdf", "w")
+            foo = open(foldername + str(i) + ".pdf", "wb")
             foo.write(my_pdf)
             foo.close()
             # foo = open(foldername + str(i) + ".txt", "w")

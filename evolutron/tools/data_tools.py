@@ -36,7 +36,6 @@ def pad_or_clip(x, n):
 def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
-    print(padded)
     try:
         filename = file_db[data_id]
         filetype = filename.split('.')[-1]

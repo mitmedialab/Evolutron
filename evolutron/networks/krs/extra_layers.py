@@ -2,13 +2,12 @@
 from __future__ import absolute_import
 
 import keras.backend as K
+import numpy as np
 from keras import activations, initializations, regularizers, constraints
 from keras.engine import InputSpec
+from keras.layers.pooling import _Pooling1D
 from keras.models import Layer
 from keras.utils.np_utils import conv_output_length
-from keras.layers.pooling import _Pooling1D
-
-import numpy as np
 
 
 class Convolution1D(Layer):
@@ -185,10 +184,10 @@ class Convolution1D(Layer):
 
 
 class Deconvolution1D(Layer):
-    def __init__(self, bound_conv_layer, apply_mask=False,
+    def __init__(self, bound_conv_layer=None, nb_filter=None, filter_length=None, apply_mask=False,
                  init='uniform', activation='linear', weights=None, subsample_length=1,
                  W_regularizer=None, b_regularizer=None, activity_regularizer=None,
-                 W_constraint=None, b_constraint=None,
+                 W_constraint=None, b_constraint=None, border_mode='valid',
                  bias=True, input_dim=None, input_length=None, **kwargs):
 
         self.supports_masking = True
@@ -197,13 +196,19 @@ class Deconvolution1D(Layer):
         if 'border_mode' in kwargs:
             raise Exception('Border mode is inferred from Conv Layer')
 
-        self._bound_conv_layer = bound_conv_layer
-        try:
-            self.nb_filter = self._bound_conv_layer.input_shape[2]
-        except Exception:
-            self.nb_filter = 'Not sure yet, input shape of convolutional layer not provided during construction.'
-        self.filter_length = self._bound_conv_layer.filter_length
-        self.border_mode = self._bound_conv_layer.border_mode
+        if bound_conv_layer:  # If instanciated through a connection
+            self._bound_conv_layer = bound_conv_layer
+            try:
+                self.nb_filter = self._bound_conv_layer.input_shape[2]
+            except Exception:
+                self.nb_filter = 'Not sure yet, input shape of convolutional layer not provided during construction.'
+            self.filter_length = self._bound_conv_layer.filter_length
+            self.border_mode = self._bound_conv_layer.border_mode
+        else:
+            # if instanciated through config
+            self.nb_filter = nb_filter
+            self.filter_length = filter_length
+            self.border_mode = border_mode
 
         self.init = initializations.get(init, dim_ordering='th')
         self.activation = activations.get(activation)
@@ -229,9 +234,16 @@ class Deconvolution1D(Layer):
 
     def build(self, input_shape):
         input_dim = input_shape[2]
-        self.nb_filter = self._bound_conv_layer.input_shape[2]
-        self.W_shape = (self.filter_length, 1, self.input_dim, self.nb_filter)
-        self.W = K.permute_dimensions(self._bound_conv_layer.W, (0, 1, 3, 2))
+
+        if hasattr(self, '_bound_conv_layer'):
+            self.nb_filter = self._bound_conv_layer.input_shape[2]
+            self.W_shape = (self.filter_length, 1, input_dim, self.nb_filter)
+            self.W = K.permute_dimensions(self._bound_conv_layer.W, (0, 1, 3, 2))
+        else:
+            self.W_shape = (self.filter_length, 1, input_dim, self.nb_filter)
+            self.W = self.init(self.W_shape, name='{}_W'.format(self.name))
+
+
         if self.bias:
             self.b = K.zeros((self.nb_filter,), name='{}_b'.format(self.name))
             self.trainable_weights = [self.b]
@@ -450,7 +462,8 @@ class Dense(Layer):
 
 
 class Dedense(Layer):
-    def __init__(self, bound_dense_layer, init='glorot_uniform', activation='linear', weights=None,
+    def __init__(self, bound_dense_layer=None, output_dim=None, init='glorot_uniform', activation='linear',
+                 weights=None,
                  W_regularizer=None, b_regularizer=None, activity_regularizer=None,
                  W_constraint=None, b_constraint=None,
                  bias=True, input_dim=None, **kwargs):
@@ -460,12 +473,15 @@ class Dedense(Layer):
         self.init = initializations.get(init)
         self.activation = activations.get(activation)
 
-        self._bound_dense_layer = bound_dense_layer
+        if bound_dense_layer:
+            self._bound_dense_layer = bound_dense_layer
 
-        try:
-            self.output_dim = self._bound_dense_layer.input_shape[0]
-        except Exception:
-            self.output_dim = 'Not sure yet, input shape of dense layer not provided during construction.'
+            try:
+                self.output_dim = self._bound_dense_layer.input_shape[0]
+            except Exception:
+                self.output_dim = 'Not sure yet, input shape of dense layer not provided during construction.'
+        else:
+            self.output_dim = output_dim
 
         self.input_dim = input_dim
 
@@ -490,8 +506,12 @@ class Dedense(Layer):
         self.input_spec = [InputSpec(dtype=K.floatx(),
                                      shape=(None, input_dim))]
 
-        self.output_dim = self._bound_dense_layer.input_shape[1]
-        self.W = K.transpose(self._bound_dense_layer.W)
+        if hasattr(self, '_bound_dense_layer'):
+            self.output_dim = self._bound_dense_layer.input_shape[1]
+            self.W = K.transpose(self._bound_dense_layer.W)
+        else:
+            self.W = self.init((input_dim, self.output_dim),
+                               name='{}_W'.format(self.name))
 
         if self.bias:
             self.b = K.zeros((self.output_dim,),
@@ -592,15 +612,18 @@ class Unpooling1D(Layer):
         3D tensor with shape: `(samples, upsampled_steps, features)`.
     """
 
-    def __init__(self, bound_pool_layer, **kwargs):
+    def __init__(self, bound_pool_layer=None, length=None, **kwargs):
 
         self.supports_masking = True
 
-        self._bound_pool_layer = bound_pool_layer
-        try:
-            self.length = self._bound_pool_layer.input_shape[1]
-        except Exception:
-            self.length = 'Not sure yet, input shape not provided during construction.'
+        if bound_pool_layer:
+            self._bound_pool_layer = bound_pool_layer
+            try:
+                self.length = self._bound_pool_layer.input_shape[1]
+            except Exception:
+                self.length = 'Not sure yet, input shape not provided during construction.'
+        else:
+            self.length = length
 
         self.input_spec = [InputSpec(ndim=3)]
         super(Unpooling1D, self).__init__(**kwargs)
@@ -610,11 +633,15 @@ class Unpooling1D(Layer):
         return (input_shape[0], length, input_shape[2])
 
     def call(self, x, mask=None):
-        self.length = self._bound_pool_layer.input_shape[1]
+
+        if hasattr(self, '_bound_pool_layer'):
+            self.length = self._bound_pool_layer.input_shape[1]
 
         pre_output = K.repeat_elements(x, self.length, axis=1)
 
-        if K.backend() == 'theano':  # if we have theano backend, we get nice upsample
+        if hasattr(self,
+                   '_bound_pool_layer') and K.backend() == 'theano':  # if we have theano backend, we get nice upsample
+            # TODO: implement this when loading
             import theano.tensor as T
             output = T.grad(K.sum(self._bound_pool_layer.output), wrt=self._bound_pool_layer.input) * pre_output
 
