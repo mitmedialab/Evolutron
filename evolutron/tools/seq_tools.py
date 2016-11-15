@@ -122,34 +122,27 @@ Transformations between representations
 #     return [np.argmax(h) for h in hot.T]
 
 
-"""def aa2hot(aa_seq):
-    num = [aa_map[aa] for aa in aa_seq]
-
-    return np.eye(23, dtype=np.float32)[num]"""
-
-def aa2hot(aa_seq):
-    hot = np.zeros(shape=(len(aa_seq), 22))
-    for idx in range(len(aa_seq)):
-        try:
-            hot[idx, aa_map[aa_seq[idx]]] = 1
-        except:
-            if aa_seq[idx] == 'X':
-                hot[idx,:] = [1/22 for _ in range(22)]
-            elif aa_seq[idx] == 'B':
-                hot[idx, aa_map['D']] = .5
-                hot[idx, aa_map['N']] = .5
-            elif aa_seq[idx] == 'Z':
-                hot[idx, aa_map['E']] = .5
-                hot[idx, aa_map['Q']] = .5
-            elif aa_seq[idx] == 'J':
-                hot[idx, aa_map['I']] = .5
-                hot[idx, aa_map['L']] = .5
-
+def aa2hot(aa_seq, n=20):
+    hot = np.zeros(shape=(len(aa_seq), n))
+    for idx, aa in enumerate(aa_seq):
+        if aa in aa_map:
+            hot[idx, aa_map[aa]] = 1
+        elif aa == 'X':
+            hot[idx, :] = [1 / n for _ in range(n)]
+        elif aa == 'B':
+            hot[idx, aa_map['D']] = .5
+            hot[idx, aa_map['N']] = .5
+        elif aa == 'Z':
+            hot[idx, aa_map['E']] = .5
+            hot[idx, aa_map['Q']] = .5
+        elif aa == 'J':
+            hot[idx, aa_map['I']] = .5
+            hot[idx, aa_map['L']] = .5
     return hot
+
 
 def hot2aa(hot):
     num = [np.argmax(h) for h in hot]
-
     return ''.join([aa_map_rev[n] for n in num])
 
 
