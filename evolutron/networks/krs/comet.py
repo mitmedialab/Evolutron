@@ -29,7 +29,7 @@ class DeepCoDER(Model):
     def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
         args = cls._build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length)
 
-        args['name'] = 'krswDeepCoDER'
+        args['name'] = cls.__class__.__name__
 
         return cls(**args)
 
@@ -47,7 +47,7 @@ class DeepCoDER(Model):
     def _build_network(input_shape, n_conv_layers, n_fc_layers, nb_filter, filter_length):
         assert len(input_shape) == 2, 'Unrecognizable input dimensions'
         assert K.image_dim_ordering() == 'tf', 'Theano dimension ordering not supported yet'
-        assert input_shape[1] in [20, 4], 'Input dimensions error, check order'
+        assert input_shape[1] in [20, 4, 22], 'Input dimensions error, check order'
 
         seq_length, alphabet = input_shape
 

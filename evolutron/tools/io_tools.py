@@ -226,17 +226,17 @@ def tab_parser(filename, dummy_option=None):
     except IOError:
         raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
         raw_data.columns = raw_data.columns.str.strip().str.lower().str.replace(' ', '_')
-        raw_data.sequence = raw_data.sequence.str.replace('X', 'M'). \
-            str.replace('Z', 'Q').str.replace('B', 'N').str.replace('U', 'S').str.replace('O', 'K')
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
 
     x_data = raw_data.sequence.apply(aa2hot).sample(frac=1).reset_index(drop=True).tolist()
 
     return x_data, None
 
+
 def SecS_parser(filename, dummy_option=None):
     """
-        This module parses data from files containing sequence and secondary structure and transforms them to Evolutron format.
+        This module parses data from files containing sequence and secondary structure
+        and transforms them to Evolutron format.
     """
 
     input_file = open(filename, "rU")
@@ -256,7 +256,7 @@ def SecS_parser(filename, dummy_option=None):
 
             flag = True
 
-    x_data = list(map(aa2hot, aa_list))
+    x_data = list(map(lambda x: aa2hot(x, 22), aa_list))
     y_data = list(map(SecS2hot, SecS_list))
 
     return x_data, None
