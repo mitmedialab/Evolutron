@@ -259,4 +259,4 @@ def SecS_parser(filename, dummy_option=None):
     x_data = list(map(lambda x: aa2hot(x, 22), aa_list))
     y_data = list(map(SecS2hot, SecS_list))
 
-    return x_data, None
+    return x_data, y_data
