@@ -39,14 +39,16 @@ print(secondary_structure.shape)"""
 # Padding sequences
 input_aa_seq = Input(shape=(example_len, num_channels))
 
-lstm = LSTM(3, input_shape=(None, example_len, num_channels),
-            return_sequences=True)(input_aa_seq)
+lstm = LSTM(num_categories, input_shape=(None, example_len, num_channels),
+            return_sequences=True, W_regularizer=l2(0.01))(input_aa_seq)
 
 flat = Flatten()(lstm)
 
-dense = Dense(example_len*3)(flat)
+dropout = Dropout(p=0.3)(lstm)
 
-reshape = Reshape(target_shape=(example_len, 3))(dense)
+dense = Dense(example_len*num_categories)(dropout)
+
+reshape = Reshape(target_shape=(example_len, num_categories))(dense)
 
 output = Activation(activation='softmax')(reshape)
 
