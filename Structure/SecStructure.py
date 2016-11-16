@@ -50,7 +50,7 @@ sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
 nadam = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
 
-model.compile(optimizer=nadam, loss='categorical_crossentropy', metrics=['categorical_crossentropy'])
+model.compile(optimizer=nadam, loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 
 model.summary()
 
