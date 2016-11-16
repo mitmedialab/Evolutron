@@ -1,7 +1,9 @@
 from keras.layers import Input, LSTM, Activation,Convolution1D, MaxPooling1D, \
-    Dense, UpSampling1D, Flatten, Reshape
+    Dense, UpSampling1D, Flatten, Reshape, Dropout
 from keras.models import Model
-from keras.optimizers import SGD
+from keras.optimizers import SGD, Nadam
+from keras.regularizers import l2, activity_l1
+from keras.utils.visualize_util import plot
 import numpy as np
 
 # Check if package is installed, else fallback to developer mode imports
@@ -16,37 +18,27 @@ except ImportError:
     from evolutron.tools import load_dataset
 
 data_id = 'SecS'
+num_categories = 8
 
 dataset, secondary_structure = load_dataset(data_id, padded=True)
 
 num_examples = dataset.shape[0]
 example_len = dataset.shape[1]
 num_channels = dataset.shape[2]
-# Check what ordering is keras using
-#dataset = dataset.transpose((0, 2, 1))
 
 print(dataset.shape)
 
-# ToDo: load real labels
-# load labels
-"""secondary_structure = np.zeros(shape=(num_examples, example_len, 3))
-for i in range(num_examples):
-    tmp = np.random.randint(1, 3, example_len)
-    secondary_structure[i, np.arange(example_len), tmp] = 1
-
-print(secondary_structure.shape)"""
-
-# Padding sequences
 input_aa_seq = Input(shape=(example_len, num_channels))
 
-lstm = LSTM(num_categories, input_shape=(None, example_len, num_channels),
-            return_sequences=True, W_regularizer=l2(0.01))(input_aa_seq)
+lstm = LSTM(output_dim=num_categories, input_shape=(None, example_len, num_channels),
+            return_sequences=True, W_regularizer=l2(0.1))(input_aa_seq)
 
 flat = Flatten()(lstm)
 
-dropout = Dropout(p=0.3)(lstm)
+dropout = Dropout(p=0.3)(flat)
 
-dense = Dense(example_len*num_categories)(dropout)
+dense = Dense(output_dim=example_len*num_categories,
+              activity_regularizer=activity_l1(0.1))(dropout)
 
 reshape = Reshape(target_shape=(example_len, num_categories))(dense)
 
@@ -56,7 +48,11 @@ model = Model(input=input_aa_seq, output=output)
 
 sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
-model.compile(optimizer=sgd, loss='categorical_crossentropy')
+nadam = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
+
+model.compile(optimizer=nadam, loss='categorical_crossentropy', metrics=['categorical_crossentropy'])
+
+model.summary()
 
 model.fit(dataset, secondary_structure,
           batch_size=128,
@@ -65,3 +61,5 @@ model.fit(dataset, secondary_structure,
           validation_split=.2)
 
 model.save('tmp')
+
+plot(model, to_file='model.png')
