@@ -3,7 +3,8 @@ from keras.layers import Input, LSTM, Activation,Convolution1D, MaxPooling1D, \
 from keras.models import Model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
-from keras.utils.visualize_util import plot
+from IPython.display import SVG
+from keras.utils.visualize_util import model_to_dot
 import numpy as np
 import argparse
 
@@ -62,7 +63,7 @@ def SecStructure(data_id, num_categories):
 
     model.save('tmp')
 
-    plot(model, to_file='model.png')
+    SVG(model_to_dot(model).create(prog='dot', format='svg'))
 
     for i in range(10):
         print(dataset[1, :, :])
