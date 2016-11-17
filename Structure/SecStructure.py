@@ -1,10 +1,14 @@
-from keras.layers import Input, LSTM, Activation,Convolution1D, MaxPooling1D, \
-    Dense, UpSampling1D, Flatten, Reshape, Dropout
+from keras.layers import Input, LSTM, Activation, Dense, \
+    Flatten, Reshape, Dropout
 from keras.models import Model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
-from IPython.display import SVG
 from keras.utils.visualize_util import model_to_dot
+from keras.metrics import categorical_accuracy
+import keras.backend as K
+
+from IPython.display import SVG
+
 import numpy as np
 import argparse
 
@@ -20,7 +24,7 @@ except ImportError:
     from evolutron.tools import load_dataset
 
 
-def SecStructure(data_id, num_categories):
+def SecStructure(args):
     dataset, secondary_structure = load_dataset(data_id, padded=True)
 
     num_examples = dataset.shape[0]
@@ -31,17 +35,17 @@ def SecStructure(data_id, num_categories):
 
     input_aa_seq = Input(shape=(example_len, num_channels))
 
-    lstm = LSTM(output_dim=num_categories, input_shape=(None, example_len, num_channels),
+    lstm = LSTM(output_dim=args.num_categories, input_shape=(None, example_len, num_channels),
                 return_sequences=True, W_regularizer=l2(0.1))(input_aa_seq)
 
     flat = Flatten()(lstm)
 
     dropout = Dropout(p=0.3)(flat)
 
-    dense = Dense(output_dim=example_len*num_categories,
+    dense = Dense(output_dim=example_len*args.num_categories,
                   activity_regularizer=activity_l1(0.1))(dropout)
 
-    reshape = Reshape(target_shape=(example_len, num_categories))(dense)
+    reshape = Reshape(target_shape=(example_len, args.num_categories))(dense)
 
     output = Activation(activation='softmax')(reshape)
 
@@ -49,26 +53,37 @@ def SecStructure(data_id, num_categories):
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 
-    nadam = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
+    nadam = Nadam(lr=0.02, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
 
-    model.compile(optimizer=nadam, loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+    model.compile(optimizer=nadam, loss='mse', metrics=['categorical_accuracy'])
 
     model.summary()
 
     model.fit(dataset, secondary_structure,
               batch_size=128,
-              nb_epoch=10,
+              nb_epoch=args.num_epochs,
               shuffle=True,
               validation_split=.2)
 
     model.save('tmp')
 
-    SVG(model_to_dot(model).create(prog='dot', format='svg'))
+    #SVG(model_to_dot(model).create(prog='dot', format='svg'))
 
-    for i in range(10):
-        print(dataset[1, :, :])
-        print(secondary_structure[:10, :, :])
-        print(model.predict(dataset[1, :, :]))
+    print(dataset[0:2, :, :])
+    print(secondary_structure[0:2, :, :])
+    print(model.predict(dataset[0:2, :, :]))
+
+
+# custom metrics: categorical accuracy for a vector of predictions
+"""def vector_categorical_accuracy(y_true, y_pred):
+    #ToDo: implement in Theano
+    return K.mean(K.equal([K.argmax(y_true[i, :, :], axis=-1) for i in K.int_shape(y_true)[0]],
+                          [K.argmax(y_pred[i, :, :], axis=-1) for i in K.int_shape(y_true)[0]]))"""
+
+
+def vector_categorical_crossentropy(y_true, y_pred):
+    return K.mean([K.categorical_crossentropy(y_pred[i, :, :],
+                                            y_true[i, :, :]) for i in K.int_shape(y_true)[0]])
 
 
 if __name__ == '__main__':
@@ -77,6 +92,8 @@ if __name__ == '__main__':
                         help='dataset size')
     parser.add_argument('--num_categories', '-c', type=int, default=8,
                         help='how many categories (3/8)?')
+    parser.add_argument('--num_epochs', '-e', type=int, default=10,
+                        help='how many epochs?')
 
     args = parser.parse_args()
 
@@ -87,4 +104,4 @@ if __name__ == '__main__':
     else:
         print('Unknown data size: should be full or small')
 
-    SecStructure(data_id, args.num_categories)
+    SecStructure(args)
