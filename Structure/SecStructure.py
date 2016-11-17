@@ -6,7 +6,7 @@ except Exception: #ImportError
 from keras.models import Model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
-from keras.utils.visualize_util import model_to_dot
+#from keras.utils.visualize_util import model_to_dot
 from keras.objectives import categorical_crossentropy
 import keras.backend as K
 
