@@ -1,5 +1,5 @@
-from keras.layers import Input, LSTM, Activation, Dense, \
-    Flatten, Reshape, Dropout
+from keras.layers import Input, LSTM, Activation, Dropout, Masking
+from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape
 from keras.models import Model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
@@ -35,8 +35,10 @@ def SecStructure(args):
 
     input_aa_seq = Input(shape=(example_len, num_channels))
 
+    masking = Masking(mask_value=0)(input_aa_seq)
+
     lstm = LSTM(output_dim=args.num_categories, input_shape=(None, example_len, num_channels),
-                return_sequences=True, W_regularizer=l2(0.1))(input_aa_seq)
+                return_sequences=True, W_regularizer=l2(0.1))(masking)
 
     flat = Flatten()(lstm)
 
