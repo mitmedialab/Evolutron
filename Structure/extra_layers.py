@@ -6,7 +6,7 @@ import numpy as np
 from keras import activations, initializations, regularizers, constraints
 from keras.engine import InputSpec
 from keras.layers.pooling import _Pooling1D
-from keras.models import Layer
+from keras.engine.topology import Layer
 from keras.utils.np_utils import conv_output_length
 
 
