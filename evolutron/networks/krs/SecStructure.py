@@ -7,7 +7,7 @@ from keras.models import Model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
 from keras.utils.visualize_util import model_to_dot
-from keras.objectives import categorical_crossentropy
+from keras.metrics import categorical_accuracy
 import keras.backend as K
 
 from IPython.display import SVG
@@ -87,11 +87,8 @@ def SecStructure(args):
 
 
 def vector_categorical_crossentropy(y_true, y_pred):
-    """return categorical_crossentropy(
-        K.permute_dimensions(K.batch_flatten(K.permute_dimensions(y_pred, (2,0,1))), (1,0)),
-        K.permute_dimensions(K.batch_flatten(K.permute_dimensions(y_true, (2,0,1))), (1,0)))"""
-    return categorical_crossentropy(K.reshape(y_true, shape=(-1, 8)),
-                                    K.reshape(y_pred, shape=(-1, 8)))
+    return K.categorical_crossentropy(K.permute_dimensions(
+        K.batch_flatten(K.permute_dimensions((2,0,1))), (1,0)))
 
 
 if __name__ == '__main__':
