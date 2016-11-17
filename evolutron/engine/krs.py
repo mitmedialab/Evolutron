@@ -11,7 +11,7 @@ import numpy as np
 
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ReduceLROnPlateau
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, TensorBoard
 import keras.optimizers as opt
 
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
@@ -117,6 +117,7 @@ class DeepTrainer:
         rn = np.random.random()
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
                                      save_best_only=True, save_weights_only=True)
+        #tb = TensorBoard()
 
         start_time = time.time()
         try:
