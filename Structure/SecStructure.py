@@ -1,5 +1,8 @@
 from keras.layers import Input, LSTM, Activation, Dropout, Masking
-from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape
+try:
+    from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape
+except Exception: #ImportError
+    from extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape
 from keras.models import Model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
@@ -53,16 +56,16 @@ def SecStructure(args):
 
     model = Model(input=input_aa_seq, output=output)
 
-    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True)
 
-    nadam = Nadam(lr=0.02, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
+    nadam = Nadam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
 
     model.compile(optimizer=nadam, loss='mse', metrics=['categorical_accuracy'])
 
     model.summary()
 
     model.fit(dataset, secondary_structure,
-              batch_size=128,
+              batch_size=args.batch_size,
               nb_epoch=args.num_epochs,
               shuffle=True,
               validation_split=.2)
@@ -96,6 +99,10 @@ if __name__ == '__main__':
                         help='how many categories (3/8)?')
     parser.add_argument('--num_epochs', '-e', type=int, default=10,
                         help='how many epochs?')
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.01,
+                        help='learning rate?')
+    parser.add_argument('--batch_size', '-b', type=int, default=128,
+                        help='batch size?')
 
     args = parser.parse_args()
 
