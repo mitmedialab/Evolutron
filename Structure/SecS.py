@@ -37,13 +37,14 @@ except ImportError:
 def supervised(x_data, y_data, handle,
                epochs=10,
                batch_size=128,
-               filters=5,
-               filter_length=5,
+               filters=8,
+               filter_length=10,
                validation=.3,
                optimizer='nadam',
                rate=.01,
                conv=1,
                fc=1,
+               lstm=1,
                nb_categories=8,
                model=None):
     # Find input shape
@@ -60,11 +61,12 @@ def supervised(x_data, y_data, handle,
     else:
         print('Building model ...')
         net_arch = DeepCoDER.from_options(input_shape,
-                                               n_conv_layers=conv,
-                                               n_fc_layers=fc,
-                                               n_filters=filters,
-                                               filter_length=filter_length,
-                                               nb_categories=nb_categories)
+                                           n_conv_layers=conv,
+                                           n_fc_layers=fc,
+                                           use_lstm=lstm,
+                                           n_filters=filters,
+                                           filter_length=filter_length,
+                                           nb_categories=nb_categories)
         handle.model = 'realDeepCoDER'
         conv_net = DeepTrainer(net_arch)
         conv_net.compile(optimizer=optimizer, lr=rate)
@@ -132,10 +134,13 @@ if __name__ == '__main__':
     parser.add_argument("--fc", type=int,
                         help='number of fc layers.')
 
+    parser.add_argument("--lstm", type=int, default=1,
+                        help='number of fc layers.')
+
     parser.add_argument("-e", "--epochs", default=50, type=int,
                         help='number of training epochs to perform (default: 50)')
 
-    parser.add_argument("-b", "--batch_size", type=int, default=50,
+    parser.add_argument("-b", "--batch_size", type=int, default=256,
                         help='Size of minibatch.')
 
     parser.add_argument("--rate", type=float,
