@@ -3,8 +3,8 @@
 from __future__ import print_function
 
 import os
-
 import numpy as np
+
 import weblogolib as wl
 from corebio.seq_io import SeqList
 
@@ -62,9 +62,7 @@ def motif_extraction(motif_fun, x_data, filters, filter_length, handle, depth):
     matches = [[] for i in range(filters)]
     for k, filt in enumerate(max_seq_scores):
         seq_mean = np.mean(filt[:, 0])
-        # seq_mean = 0
         seq_std = np.std(filt[:, 0])
-        # seq_std = 0
         for i, seq in enumerate(filt):
             if seq[0] > seq_mean + 3 * seq_std:
                 j = int(seq[1])

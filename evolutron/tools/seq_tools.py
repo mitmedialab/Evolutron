@@ -123,6 +123,9 @@ Transformations between representations
 
 
 def aa2hot(aa_seq, n=20):
+    if n == 20:
+        aa_map.pop('U', 0)
+        aa_map.pop('O', 0)
     hot = np.zeros(shape=(len(aa_seq), n))
     for idx, aa in enumerate(aa_seq):
         if aa in aa_map:

@@ -1,6 +1,6 @@
 # coding=utf-8
 """Define the tools top level"""
-from .data_tools import data_it, load_dataset
+from .data_tools import data_it, load_dataset, file_db
 
 from .seq_tools import (hot2aa, aa2hot, nt2prob, prob2nt,
                         aa_map, aa_map_rev, nt_map)
