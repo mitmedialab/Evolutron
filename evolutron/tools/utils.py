@@ -2,6 +2,9 @@
 import numpy as np
 
 
+def get_args(kwargs, args):
+    return {k: kwargs.pop(k) for k in args if k in kwargs}
+
 def none2str(s):
     if s is None:
         return ''

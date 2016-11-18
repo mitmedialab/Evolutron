@@ -220,17 +220,27 @@ def fasta_parser(filename, dummy_option=None):
     return x_data, None
 
 
-def tab_parser(filename, dummy_option=None):
+def tab_parser(filename, codes=False):
     try:
         raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
     except IOError:
         raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
         raw_data.columns = raw_data.columns.str.strip().str.lower().str.replace(' ', '_')
+        pf = raw_data['protein_families'].astype('category')
+        raw_data['codes'] = pf.cat.codes
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
 
-    x_data = raw_data.sequence.apply(aa2hot).sample(frac=1).reset_index(drop=True).tolist()
+    raw_data = raw_data.sample(frac=1).reset_index(drop=True)
 
-    return x_data, None
+    x_data = raw_data.sequence.apply(aa2hot).tolist()
+
+    if codes:
+        y_data = raw_data.codes.tolist()
+        y_data = [y+1 for y in y_data]
+    else:
+        y_data = None
+
+    return x_data, y_data
 
 
 def SecS_parser(filename, nb_categories=8, dummy_option=None):
