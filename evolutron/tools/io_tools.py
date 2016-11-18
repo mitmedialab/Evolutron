@@ -235,8 +235,10 @@ def tab_parser(filename, codes=False):
     x_data = raw_data.sequence.apply(aa2hot).tolist()
 
     if codes:
-        y_data = raw_data.codes.tolist()
+        pos_data = raw_data[raw_data['codes']>0]
+        y_data = pos_data.codes.tolist()
         y_data = [y+1 for y in y_data]
+        x_data = pos_data.sequence.apply(aa2hot).tolist()
     else:
         y_data = None
 
