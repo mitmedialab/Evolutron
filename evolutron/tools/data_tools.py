@@ -65,7 +65,7 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
         except:
             pass
 
-    if not y_data:
+    if not y_data.any():
         # Unsupervised Learning
         # x_data: observations
 

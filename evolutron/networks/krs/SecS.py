@@ -1,8 +1,8 @@
 from keras.layers import Input, LSTM, Activation, Dropout, Masking
 try:
-    from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D
+    from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
 except Exception: #ImportError
-    from extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D
+    from extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
 from keras.models import Model, load_model
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
@@ -23,7 +23,7 @@ class DeepCoDER(Model):
 
     @classmethod
     def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1,
-                     use_lstm=1, nb_categories=8):
+                     use_lstm=1, nb_categories=8, dilation=1):
 
         args = cls._build_network(aa_length, n_conv_layers, n_fc_layers, use_lstm, n_filters,
                                   filter_length, nb_categories)
@@ -44,7 +44,7 @@ class DeepCoDER(Model):
 
     @staticmethod
     def _build_network(input_shape, n_conv_layers, n_fc_layers, use_lstm, nb_filter,
-                       filter_length, nb_categories):
+                       filter_length, nb_categories, dilation=1):
         assert len(input_shape) == 2, 'Unrecognizable input dimensions'
         assert K.image_dim_ordering() == 'tf', 'Theano dimension ordering not supported yet'
         assert input_shape[1] in [20, 4, 22], 'Input dimensions error, check order'
@@ -57,18 +57,20 @@ class DeepCoDER(Model):
         mask = Masking(mask_value=0.0)(inp)
 
         # Convolutional Layers
-        convs = [Convolution1D(nb_filter, filter_length,
-                               init='glorot_uniform',
-                               activation='relu',
-                               border_mode='same',
-                               name='Conv1')(mask)]
+        convs = [AtrousConvolution1D(nb_filter, filter_length,
+                                     atrous_rate=1,
+                                     init='glorot_uniform',
+                                     activation='relu',
+                                     border_mode='same',
+                                     name='Conv1')(mask)]
 
         for c in range(1, n_conv_layers):
-            convs.append(Convolution1D(nb_filter, filter_length,
-                                       init='glorot_uniform',
-                                       activation='relu',
-                                       border_mode='same',
-                                       name='Conv{}'.format(c + 1))(convs[-1]))
+            convs.append(AtrousConvolution1D(nb_filter, filter_length,
+                                             atrous_rate=dilation^c,
+                                             init='glorot_uniform',
+                                             activation='relu',
+                                             border_mode='same',
+                                             name='Conv{}'.format(c + 1))(convs[-1]))
 
         # Max-pooling
         """

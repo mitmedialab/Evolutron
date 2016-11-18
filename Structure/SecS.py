@@ -46,6 +46,7 @@ def supervised(x_data, y_data, handle,
                fc=1,
                lstm=1,
                nb_categories=8,
+               dilation=1,
                model=None):
 
     filters = nb_categories
@@ -69,7 +70,8 @@ def supervised(x_data, y_data, handle,
                                            use_lstm=lstm,
                                            n_filters=filters,
                                            filter_length=filter_length,
-                                           nb_categories=nb_categories)
+                                           nb_categories=nb_categories,
+                                          dilation=dilation)
         handle.model = 'realDeepCoDER'
         conv_net = DeepTrainer(net_arch)
         conv_net.compile(optimizer=optimizer, lr=rate)
@@ -158,6 +160,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--nb_categories', '-c', type=int, default=8,
                         help='how many categories (3/8)?')
+
+    parser.add_argument('--dilation', type=int, default=1,
+                        help='dilation?')
 
     args = parser.parse_args()
 
