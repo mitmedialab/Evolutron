@@ -55,7 +55,7 @@ aa_map_rev = {
     21: 'O',
 }
 
-SecS_map = {
+SecS_map_8cat = {
     ' ': 0,
     'L': 0,
     'C': 0,
@@ -68,7 +68,7 @@ SecS_map = {
     'I': 7,
 }
 
-SecS_map_rev = {
+SecS_map_8cat_rev = {
     0: 'C',
     1: 'H',
     2: 'G',
@@ -77,6 +77,25 @@ SecS_map_rev = {
     5: 'B',
     6: 'E',
     7: 'I',
+}
+
+SecS_map_3cat = {
+    ' ': 0,
+    'L': 0,
+    'C': 0,
+    'H': 1,
+    'G': 1,
+    'T': 0,
+    'S': 0,
+    'B': 2,
+    'E': 2,
+    'I': 1,
+}
+
+SecS_map_3cat_rev = {
+    0: 'C',
+    1: 'H',
+    2: 'E',
 }
 
 nt_map = {
@@ -149,15 +168,26 @@ def hot2aa(hot):
     return ''.join([aa_map_rev[n] for n in num])
 
 
-def SecS2hot(sec_seq):
-    num = [SecS_map[s] for s in sec_seq]
+def SecS2hot_8cat(sec_seq):
+    num = [SecS_map_8cat[s] for s in sec_seq]
     return np.eye(8, dtype=np.float32)[num]
 
 
-def hot2SecS(hot):
+def SecS2hot_3cat(sec_seq):
+    num = [SecS_map_3cat[s] for s in sec_seq]
+    return np.eye(3, dtype=np.float32)[num]
+
+
+def hot2SecS_8cat(hot):
     num = [np.argmax(h) for h in hot]
 
-    return ''.join([SecS_map_rev[n] for n in num])
+    return ''.join([SecS_map_8cat_rev[n] for n in num])
+
+
+def hot2SecS_3cat(hot):
+    num = [np.argmax(h) for h in hot]
+
+    return ''.join([SecS_map_3cat_rev[n] for n in num])
 
 
 def nt2prob(seq):

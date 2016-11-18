@@ -135,5 +135,6 @@ class DeepCoDER(Model):
 
     @staticmethod
     def mean_cat_acc(y_true, y_pred):
-        return categorical_accuracy(K.reshape(y_true, shape=(-1, 8)),
-                                    K.reshape(y_pred, shape=(-1, 8)))
+        nb_categories = K.shape(y_true)[-1]
+        return categorical_accuracy(K.reshape(y_true, shape=(-1, nb_categories)),
+                                    K.reshape(y_pred, shape=(-1, nb_categories)))
