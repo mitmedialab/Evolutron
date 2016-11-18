@@ -1,6 +1,6 @@
 # coding=utf-8
 
-from .krs.comet import DeepCoDER
+from .krs.comet import DeepCoDER, DeepCoFAM
 
 from .krs.extra_layers import Deconvolution1D, Dedense, Unpooling1D
 

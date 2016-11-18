@@ -93,22 +93,22 @@ class DeepTrainer:
         else:
             x_train, x_valid, y_train, y_valid = train_test_split(x_data, y_data, test_size=validate)
 
-        if self.classification:
-            msg = 'Distribution of Examples per set'
-            print(msg)
-            print('-' * len(msg))
-            classes = ['Class ' + str(i) for i in range(len(np.unique(y_data)))]
-            counts = dict()
-            _, c = np.unique(y_train, return_counts=True)
-            counts['train'] = c
-            _, c = np.unique(y_valid, return_counts=True)
-            counts['valid'] = c
-
-            print(tabulate([['Set'] + classes + ['Total'],
-                            ['Train'] + counts['train'].tolist() + [counts['train'].sum()],
-                            ['Valid'] + counts['valid'].tolist() + [counts['valid'].sum()]],
-                           stralign='center',
-                           headers="firstrow"))
+        # if self.classification:
+        #     msg = 'Distribution of Examples per set'
+        #     print(msg)
+        #     print('-' * len(msg))
+        #     classes = ['Class ' + str(i) for i in range(len(np.unique(y_data)))]
+        #     counts = dict()
+        #     _, c = np.unique(y_train, return_counts=True)
+        #     counts['train'] = c
+        #     _, c = np.unique(y_valid, return_counts=True)
+        #     counts['valid'] = c
+        #
+        #     print(tabulate([['Set'] + classes + ['Total'],
+        #                     ['Train'] + counts['train'].tolist() + [counts['train'].sum()],
+        #                     ['Valid'] + counts['valid'].tolist() + [counts['valid'].sum()]],
+        #                    stralign='center',
+        #                    headers="firstrow"))
 
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
@@ -118,7 +118,7 @@ class DeepTrainer:
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
                                      save_best_only=True, save_weights_only=True)
         #tb = TensorBoard()
-
+        print(x_train.shape, y_train.shape)
         start_time = time.time()
         try:
             self.network.fit(x_train, y_train,

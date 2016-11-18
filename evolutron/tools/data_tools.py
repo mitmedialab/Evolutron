@@ -65,7 +65,7 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
         except:
             pass
 
-    if y_data == None:
+    if not y_data:
         # Unsupervised Learning
         # x_data: observations
 
@@ -80,15 +80,9 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
         except AssertionError:
             print('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data)))
             raise IOError
-        data_size = len(x_data)
 
-        # If sequences are padded, transform data list into a numpy array for mini-batching
-        try:
-            x_data = np.asarray(x_data, dtype=np.float32)
-            y_data = np.asarray(y_data, dtype=np.float32)
-        except ValueError:
-            pass
+        data_size = len(x_data)
 
         print('Dataset size: {0}'.format(data_size))
 
-        return x_data, y_data
+        return x_data, np.asarray(y_data, dtype=np.int32)
