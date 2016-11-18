@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot, SecS2hot
+from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot, SecS2hot_8cat, SecS2hot_3cat
 
 
 ############################
@@ -233,7 +233,7 @@ def tab_parser(filename, dummy_option=None):
     return x_data, None
 
 
-def SecS_parser(filename, dummy_option=None):
+def SecS_parser(filename, nb_categories=8, dummy_option=None):
     """
         This module parses data from files containing sequence and secondary structure
         and transforms them to Evolutron format.
@@ -257,6 +257,11 @@ def SecS_parser(filename, dummy_option=None):
             flag = True
 
     x_data = list(map(lambda x: aa2hot(x, 22), aa_list))
-    y_data = list(map(SecS2hot, SecS_list))
+    if nb_categories == 8:
+        y_data = list(map(SecS2hot_8cat, SecS_list))
+    elif nb_categories == 3:
+        y_data = list(map(SecS2hot_3cat, SecS_list))
+    else:
+        raise TypeError('Number of categories should be 8 or 3')
 
     return x_data, y_data

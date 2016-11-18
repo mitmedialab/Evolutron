@@ -47,6 +47,9 @@ def supervised(x_data, y_data, handle,
                lstm=1,
                nb_categories=8,
                model=None):
+
+    filters = nb_categories
+
     # Find input shape
     if type(x_data) == np.ndarray:
         input_shape = x_data[0].shape
@@ -102,9 +105,10 @@ def main(**options):
 
     # Load the dataset
     print("Loading data...")
-    dataset_options = get_args(options, ['data_id', 'padded'])
+    dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories'])
     dataset = load_dataset(**dataset_options)
 
+    options['nb_categories'] = dataset_options['nb_categories']
     supervised(dataset[0], dataset[1], handle, **options)
 
 
