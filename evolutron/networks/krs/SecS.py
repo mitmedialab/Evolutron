@@ -8,7 +8,7 @@ from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
 from keras.utils.visualize_util import model_to_dot
 from keras.metrics import categorical_accuracy
-from keras.objectives import categorical_crossentropy
+from keras.objectives import categorical_crossentropy, mse
 from keras.callbacks import TensorBoard
 import keras.backend as K
 
@@ -129,8 +129,9 @@ class DeepCoDER(Model):
 
     @staticmethod
     def _loss_function(y_true, y_pred):
-        return K.mean(categorical_crossentropy(K.reshape(y_true, shape=(-1, 8)),
-                                               K.reshape(y_pred, shape=(-1, 8))))
+        """return K.mean(categorical_crossentropy(K.reshape(y_true, shape=(-1, 8)),
+                                               K.reshape(y_pred, shape=(-1, 8))))"""
+        return mse(y_true, y_pred)
 
     @staticmethod
     def mean_cat_acc(y_true, y_pred):
