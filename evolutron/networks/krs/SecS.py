@@ -57,7 +57,7 @@ class DeepCoDER(Model):
         mask = Masking(mask_value=0.0)(inp)
 
         # Convolutional Layers
-        convs = [AtrousConvolution1D(nb_filter, filter_length,
+        """convs = [AtrousConvolution1D(nb_filter, filter_length,
                                      atrous_rate=1,
                                      init='glorot_uniform',
                                      activation='relu',
@@ -67,6 +67,20 @@ class DeepCoDER(Model):
         for c in range(1, n_conv_layers):
             convs.append(AtrousConvolution1D(nb_filter, filter_length,
                                              atrous_rate=dilation^c,
+                                             init='glorot_uniform',
+                                             activation='relu',
+                                             border_mode='same',
+                                             name='Conv{}'.format(c + 1))(convs[-1]))"""
+
+        # Convolutional Layers
+        convs = [Convolution1D(nb_filter, filter_length,
+                                     init='glorot_uniform',
+                                     activation='relu',
+                                     border_mode='same',
+                                     name='Conv1')(mask)]
+
+        for c in range(1, n_conv_layers):
+            convs.append(Convolution1D(nb_filter, filter_length,
                                              init='glorot_uniform',
                                              activation='relu',
                                              border_mode='same',

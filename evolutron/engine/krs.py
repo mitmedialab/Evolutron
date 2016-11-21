@@ -13,6 +13,7 @@ from keras.callbacks import EarlyStopping
 from keras.callbacks import ReduceLROnPlateau
 from keras.callbacks import ModelCheckpoint, TensorBoard
 import keras.optimizers as opt
+import keras.backend as K
 
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 
@@ -117,17 +118,28 @@ class DeepTrainer:
         rn = np.random.random()
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
                                      save_best_only=True, save_weights_only=True)
-        #tb = TensorBoard()
+        if K.backend() == "tensorflow":
+            tb = TensorBoard()
+
         print(x_train.shape, y_train.shape)
         start_time = time.time()
         try:
-            self.network.fit(x_train, y_train,
-                             validation_data=(x_valid, y_valid),
-                             shuffle=shuffle,
-                             nb_epoch=nb_epoch,
-                             batch_size=batch_size,
-                             callbacks=[es, reduce_lr, checkpoint],
-                             verbose=1)
+            if K.backend() == "tensorflow":
+                self.network.fit(x_train, y_train,
+                                 validation_data=(x_valid, y_valid),
+                                 shuffle=shuffle,
+                                 nb_epoch=nb_epoch,
+                                 batch_size=batch_size,
+                                 callbacks=[es, reduce_lr, checkpoint, tb],
+                                 verbose=1)
+            else:
+                self.network.fit(x_train, y_train,
+                                 validation_data=(x_valid, y_valid),
+                                 shuffle=shuffle,
+                                 nb_epoch=nb_epoch,
+                                 batch_size=batch_size,
+                                 callbacks=[es, reduce_lr, checkpoint],
+                                 verbose=1)
         except KeyboardInterrupt:
             pass
 
