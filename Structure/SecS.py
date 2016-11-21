@@ -84,6 +84,7 @@ def supervised(x_data, y_data, handle,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
+                 patience=100
                  )
 
     #print('Testing model ...')
@@ -163,6 +164,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--dilation', type=int, default=1,
                         help='dilation?')
+
+    parser.add_argument('--validation', type=float, default=.2,
+                        help='validation set size?')
 
     args = parser.parse_args()
 

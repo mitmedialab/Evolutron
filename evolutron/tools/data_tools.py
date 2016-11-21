@@ -14,7 +14,8 @@ file_db = {
     'cd4': 'sprot_cd4_pfam.tsv',
     'dnabind': 'sprot_dna_tf_pfam.tsv',
     'SecS': 'SecS.sec',
-    'smallSecS': 'smallSecS.sec'
+    'smallSecS': 'smallSecS.sec',
+    'cullPDB': 'cullpdb+profile_6133_filtered.npy.gz'
 }
 
 
@@ -50,6 +51,8 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
         x_data, y_data = io.fasta_parser('datasets/' + filename, **parser_options)
     elif filetype == 'sec':
         x_data, y_data = io.SecS_parser('datasets/' + filename, **parser_options)
+    elif filetype == 'gz':
+        x_data, y_data = io.npz_parser('datasets/' + filename, **parser_options)
     else:
         raise NotImplementedError('There is no parser for current file type.')
 
