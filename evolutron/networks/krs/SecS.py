@@ -131,8 +131,9 @@ class DeepCoDER(Model):
 
     @staticmethod
     def _loss_function(y_true, y_pred):
-        """return K.mean(categorical_crossentropy(K.reshape(y_true, shape=(-1, 8)),
-                                               K.reshape(y_pred, shape=(-1, 8))))"""
+        nb_categories = K.shape(y_true)[-1]
+        """return categorical_crossentropy(K.reshape(y_true, shape=(-1, nb_categories)),
+                                        K.reshape(y_pred, shape=(-1, nb_categories)))"""
         return mse(y_true, y_pred)
 
     @staticmethod

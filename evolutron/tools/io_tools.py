@@ -277,3 +277,19 @@ def SecS_parser(filename, nb_categories=8, dummy_option=None):
         raise TypeError('Number of categories should be 8 or 3')
 
     return x_data, y_data
+
+
+def npz_parser(filename, nb_categories=8, dummy_option=None):
+    """
+        This module parses data from npz files containing sequence and secondary structure
+        and transforms them to Evolutron format.
+    """
+
+    data = np.load(filename)
+
+    data = np.reshape(data[:], (-1, 700, 57))
+
+    x_data = data[:,:,:22]
+    y_data = data[:,:,22:30]
+
+    return x_data, y_data
