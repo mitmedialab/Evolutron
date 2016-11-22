@@ -5,6 +5,7 @@ import numpy as np
 def get_args(kwargs, args):
     return {k: kwargs.pop(k) for k in args if k in kwargs}
 
+
 def none2str(s):
     if s is None:
         return ''
@@ -30,70 +31,15 @@ def probability(x):
     return x
 
 
-class Handle(object):
-    """ Handles names for loading and saving different models.
+def count_lines(f):
+    """ Counts the lines of large files by blocks.
     """
 
-    def __init__(self,
-                 epochs=None,
-                 batch_size=None,
-                 filters=None,
-                 filter_length=None,
-                 model=None,
-                 ftype=None,
-                 program=None,
-                 data_id=None,
-                 **kwargs):
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.filters = filters
-        self.filter_size = filter_length
+    def blocks(files, size=65536):
+        while True:
+            b = files.read(size)
+            if not b:
+                break
+            yield b
 
-        self.model = model
-        self.ftype = ftype
-        self.program = program
-        self.dataset = data_id
-
-        self.filename = str(self).split('/')[-1]
-
-    def __str__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
-                                                    self.filters,
-                                                    self.filter_size,
-                                                    self.epochs,
-                                                    self.batch_size,
-                                                    self.model,
-                                                    self.ftype)
-
-    def __repr__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
-                                                    self.filters,
-                                                    self.filter_size,
-                                                    self.epochs,
-                                                    self.batch_size,
-                                                    self.model,
-                                                    self.ftype)
-
-    def __add__(self, other):
-        return str(self) + other
-
-    def __radd__(self, other):
-        return other + str(self)
-
-    @classmethod
-    def from_filename(cls, filename):
-        try:
-            basename, ftype, __ = filename.split('.')
-        except ValueError:
-            basename, ftype = filename.split('.')
-        dataset = basename.split('/')[-2]
-
-        info = basename.split('/')[-1]
-
-        filters, filter_size, epochs, batch_size = map(int, info.split('_')[:4])
-
-        model = info.split('_')[-1]
-
-        obj = cls(epochs, batch_size, filters, filter_size, data_id=dataset, model=model, ftype=ftype)
-
-        return obj
+    return sum(bl.count("\n") for bl in blocks(f))

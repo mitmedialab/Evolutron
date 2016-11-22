@@ -6,7 +6,6 @@ For more information, contact:
 """
 from __future__ import absolute_import
 # from . import evaluations
-from . import helpers
 from . import motifs
 from . import networks
 from . import structural
