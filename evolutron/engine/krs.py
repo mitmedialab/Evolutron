@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
 
 import os
 import time
 from collections import OrderedDict, defaultdict
 
-from tabulate import tabulate
-import numpy as np
-
-from keras.callbacks import EarlyStopping
-from keras.callbacks import ReduceLROnPlateau
-from keras.callbacks import ModelCheckpoint, TensorBoard
-import keras.optimizers as opt
 import keras.backend as K
-
+import keras.optimizers as opt
+import numpy as np
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ModelCheckpoint, TensorBoard
+from keras.callbacks import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
+from tabulate import tabulate
+
 
 # TODO: implement enhanced progbar logger
 
@@ -30,7 +29,8 @@ class DeepTrainer:
         self.verbose = verbose
 
         self.network = network
-        self.inp = network.input
+        self.input = network.input
+        self.output = network.output
 
         self.classification = classification
 
@@ -41,8 +41,6 @@ class DeepTrainer:
         self.valid_loss = []
         self.train_acc = []
         self.valid_acc = []
-        # self.val_prc_auc_mem = []
-        # self.val_roc_auc_mem = []
 
         self.fold_train_losses = None
         self.fold_val_losses = None
@@ -64,8 +62,9 @@ class DeepTrainer:
                 }
 
         self.network.compile(loss=self.network._loss_function,
+                             loss_weights=options.get('loss_weights', None),
                              optimizer=opts[optimizer],
-                             metrics=[self.network.mean_cat_acc])
+                             metrics=self.network.metrics)
         self._create_functions()
 
     def _create_functions(self):
@@ -84,15 +83,40 @@ class DeepTrainer:
         # nb_val_samples=None, class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False)
         raise NotImplementedError
 
+    @staticmethod
+    def _check_and_split_data(data, check_var, test_size=.0, stratify=None):
+
+        # Assert inputs and outputs match the model specs
+        if isinstance(data, np.ndarray):
+            if isinstance(check_var, list):
+                raise ValueError('Number of inputs does not match model inputs.')
+            return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
+        elif isinstance(data, list):
+            assert (len(data) == len(check_var)), 'Number of inputs does not match model inputs.'
+            train, test = zip(
+                *[train_test_split(d, test_size=test_size, stratify=stratify, random_state=5) for d in data])
+            return list(train), list(test)
+        elif isinstance(data, dict):
+            raise NotImplementedError('Not implemented dictionary splitting yet. Please submit as list')
+        else:
+            raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
+
     def fit(self, x_data, y_data, nb_epoch=1, batch_size=64, shuffle=True, validate=.0, patience=10,
-            return_best_model=True):
+            return_best_model=True, verbose=1, extra_callbacks=None):
+
+        # Check arguments
+        if extra_callbacks is None:
+            extra_callbacks = []
         assert (validate >= 0)
-        assert self._funcs_init
+        assert nb_epoch > 0
 
         if self.classification:
-            x_train, x_valid, y_train, y_valid = train_test_split(x_data, y_data, test_size=validate, stratify=y_data)
+            stratify = y_data
         else:
-            x_train, x_valid, y_train, y_valid = train_test_split(x_data, y_data, test_size=validate)
+            stratify = None
+
+        x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+        y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
 
         # if self.classification:
         #     msg = 'Distribution of Examples per set'
@@ -113,33 +137,28 @@ class DeepTrainer:
 
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                                      patience=patience / 2, min_lr=0.001)
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
+                                      patience=3, min_lr=0.001, verbose=1)
         rn = np.random.random()
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
                                      save_best_only=True, save_weights_only=True)
+
         if K.backend() == "tensorflow":
             tb = TensorBoard()
+            callbacks = [es, reduce_lr, checkpoint, tb]
+        else:
+            callbacks = [es, reduce_lr, checkpoint]
 
-        print(x_train.shape, y_train.shape)
         start_time = time.time()
         try:
-            if K.backend() == "tensorflow":
-                self.network.fit(x_train, y_train,
-                                 validation_data=(x_valid, y_valid),
-                                 shuffle=shuffle,
-                                 nb_epoch=nb_epoch,
-                                 batch_size=batch_size,
-                                 callbacks=[es, reduce_lr, checkpoint, tb],
-                                 verbose=1)
-            else:
-                self.network.fit(x_train, y_train,
-                                 validation_data=(x_valid, y_valid),
-                                 shuffle=shuffle,
-                                 nb_epoch=nb_epoch,
-                                 batch_size=batch_size,
-                                 callbacks=[es, reduce_lr, checkpoint],
-                                 verbose=1)
+            self.network.fit(x_train, y_train,
+                             validation_data=(x_valid, y_valid),
+                             shuffle=shuffle,
+                             nb_epoch=nb_epoch,
+                             batch_size=batch_size,
+                             callbacks=callbacks + extra_callbacks,
+                             verbose=verbose)
+
         except KeyboardInterrupt:
             pass
 
@@ -147,15 +166,6 @@ class DeepTrainer:
             self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
 
         self.history = self.network.history
-
-        self.train_loss = self.history.history['loss']
-        if validate > 0:
-            self.valid_loss = self.history.history['val_loss']
-
-        if self.classification:
-            self.train_acc = self.history.history['acc']
-            if validate > 0:
-                self.valid_acc = self.history.history['val_acc']
 
         print(
             'Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.train_loss), time.time() - start_time))
@@ -396,7 +406,6 @@ class DeepTrainer:
         self.history = self.network.history
 
     def save_train_history(self, handle):
-        assert (not self.train_loss == [])
         handle.ftype = 'history'
         handle.epochs = len(self.train_loss)
 
@@ -404,10 +413,7 @@ class DeepTrainer:
         if not os.path.exists('/'.join(filename.split('/')[:-1])):
             os.makedirs('/'.join(filename.split('/')[:-1]))
 
-        np.savez_compressed(filename,
-                            train_loss=self.train_loss, val_loss=self.valid_loss,
-                            train_acc=self.train_acc, val_acc_mem=self.valid_acc)
-        # val_prc_auc_mem=self.val_prc_auc_mem, val_roc_auc_mem=self.val_roc_auc_mem)
+        np.savez_compressed(filename, **self.history.history)
 
         print('History saved to: ' + filename)
 

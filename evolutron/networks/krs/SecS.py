@@ -29,6 +29,9 @@ class DeepCoDER(Model):
     def __init__(self, input, output, name=None):
         super(DeepCoDER, self).__init__(input, output, name)
 
+        self.metrics = [self.mean_cat_acc, ]
+
+
     @classmethod
     def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1,
                      use_lstm=1, nb_categories=8, dilation=1):

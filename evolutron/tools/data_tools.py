@@ -68,12 +68,13 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False
         if i_am_kfir:
             try:
                 y_data = np.asarray([pad_or_clip(y, max_aa) for y in y_data])
+                return x_data, y_data
             except:
                 pass
 
     data_size = len(x_data)
 
-    if not y_data.any():
+    if not y_data:
         # Unsupervised Learning
         # x_data: observations
 
