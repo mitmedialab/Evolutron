@@ -315,7 +315,13 @@ class Handle(object):
 
         info = basename.split('/')[-1]
 
-        filters, filter_size, epochs, batch_size = map(int, info.split('_')[:4])
+        try:
+            filters, filter_size, epochs, batch_size = map(int, info.split('_')[:4])
+        except ValueError:
+            filters, filter_size, epochs, batch_size = info.split('_')[:4]
+            filter_size = int(filter_size)
+            epochs = int(epochs)
+            batch_size = int(batch_size)
 
         model = info.split('_')[-1]
 

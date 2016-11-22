@@ -15,7 +15,8 @@ file_db = {
     'dnabind': 'sprot_dna_tf_pfam.tsv',
     'SecS': 'SecS.sec',
     'smallSecS': 'smallSecS.sec',
-    'cullPDB': 'cullpdb+profile_6133_filtered.npy.gz'
+    'cullPDB': 'cullpdb+profile_6133_filtered.npy.gz',
+    'cb513': 'cb513+profile_split1.npy.gz',
 }
 
 
