@@ -13,10 +13,8 @@
 """
 import keras.backend as K
 from keras.layers import Input
-from keras.layers import Merge
-from keras.metrics import categorical_accuracy
 from keras.models import Model, load_model
-from keras.objectives import categorical_crossentropy
+from keras.metrics import categorical_accuracy
 
 from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten  # To implement masking
 
@@ -24,6 +22,8 @@ from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten  # To impl
 class DeepDNABind(Model):
     def __init__(self, input, output, name=None):
         super(DeepDNABind, self).__init__(input, output, name)
+
+        self.metrics = [self.mean_cat_acc]
 
     @classmethod
     def from_options(cls, input_shape, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
@@ -92,18 +92,12 @@ class DeepDNABind(Model):
                                     activation='softmax',
                                     name='Classifier{}'.format(i + 1))(encoded))
 
-        output = Merge(classifier, mode='concat')
+        return {'input': inp, 'output': classifier}
 
-        return {'input': inp, 'output': output}
+    @property
+    def _loss_function(self):
+        return 'categorical_crossentropy'
 
-    @staticmethod
-    def _loss_function(y_true, y_pred):
-        print(y_pred._keras_shape)
-        print(y_true._keras_shape)
-        loss = categorical_crossentropy(y_pred, y_true)
-        return loss
-
-    @staticmethod
-    def mean_cat_acc(y_true, y_pred):
-        cat_acc = categorical_accuracy(y_pred, y_true)
-        return cat_acc
+    @property
+    def mean_cat_acc(self):
+        return 'categorical_accuracy'
