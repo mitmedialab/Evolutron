@@ -60,7 +60,7 @@ def supervised(x_data, y_data, handle,
         raise TypeError('Something went wrong with the dataset type')
 
     if model:
-        conv_net = DeepTrainer(nets.DeepCoDER.from_saved_model(model))
+        conv_net = DeepTrainer(DeepCoDER.from_saved_model(model))
         print('Loaded model')
     else:
         print('Building model ...')
@@ -84,12 +84,12 @@ def supervised(x_data, y_data, handle,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
-                 patience=100
+                 patience=500
                  )
 
-    #print('Testing model ...')
-    #score = conv_net.score(x_data[int(.9 * len(x_data)):], x_data[int(.9 * len(x_data)):])
-    #print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
+    print('Testing model ...')
+    score = conv_net.score(x_data, y_data)
+    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
     conv_net.save_train_history(handle)
     conv_net.save_model_to_file(handle)
@@ -102,7 +102,7 @@ def get_args(kwargs, args):
 def main(**options):
     if 'model' in options:
         handle = Handle.from_filename(options.get('model'))
-        assert handle.program == 'CoMET', 'The model file provided is for another program.'
+        #assert handle.program == 'SecS', 'The model file provided is for another program.'
     else:
         handle = Handle(**options)
 
@@ -178,7 +178,13 @@ if __name__ == '__main__':
         kwargs['padded'] = False
 
     if hasattr(args, 'model'):
-        kwargs.pop('filters')
-        kwargs.pop('filter_length')
+        try:
+            kwargs.pop('filters')
+        except:
+            pass
+        try:
+            kwargs.pop('filter_length')
+        except:
+            pass
 
     main(**kwargs)
