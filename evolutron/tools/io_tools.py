@@ -142,54 +142,21 @@ def m6a(padded=False, min_aa=None, max_aa=None, probe='both'):
     return dataset
 
 
-def type2p(padded=False, min_aa=None, max_aa=None):
+def type2p_code(description):
     """
         This module parses data from REBASE and transforms them for Evolutron
     """
-    # Read raw input
-    f = open('datasets/type2p_and_ps.in', 'r')
-    input_raw = cPickle.load(f)
+    # Read fasta input
+    rec_site = description.split(' ')[-1]
 
-    # Transform raw input into data-set
-    aa_list = []
-    nt_list = []
-    for enz in input_raw:
-        if enz.seq.find('X') == -1:
-            aa_list.append(str(enz.seq))
-            nt_list.append(enz.description)
+    code = np.zeros((len(rec_site), 4), dtype=np.float32)
+    for j, nt in enumerate(rec_site):
+        code[j, :] = np.asarray(nt_map[nt])
 
-    if padded:
-        if not max_aa:
-            max_aa = max(map(len, aa_list))
-        x_data = np.zeros((len(aa_list), 20, max(min_aa, max_aa)), dtype=np.float32)
-        for i, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                if j > max_aa - 1:
-                    break
-                x_data[i, int(aa_map[aa]), j] = 1
-    else:
-        if not max_aa:
-            max_aa = max(map(len, aa_list))
-        x_data = [np.zeros((20, min(max(len(aa_seq), min_aa), max_aa)), dtype=np.float32) for aa_seq in aa_list]
-
-        for ind, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                if j > max_aa - 1:
-                    break
-                x_data[ind][int(aa_map[aa]), j] = 1
-
-    y_data = [np.zeros((len(nt_seq), 4), dtype=np.float32) for nt_seq in nt_list]
-    for ind, nt_seq in enumerate(nt_list):
-        for j, nt in enumerate(nt_seq):
-            y_data[ind][j, :] = np.asarray(nt_map[nt])
-        y_data[ind] = y_data[ind].reshape(24)
-
-    dataset = x_data, y_data
-
-    return dataset
+    return code.flatten()
 
 
-def fasta_parser(filename, dummy_option=None):
+def fasta_parser(filename, codes=False):
     """
         This module parses data from FASTA files and transforms them to Evolutron format.
     """
@@ -197,14 +164,20 @@ def fasta_parser(filename, dummy_option=None):
     input_file = open(filename, "rU")
 
     aa_list = []
+    code_list = []
     for record in SeqIO.parse(input_file, "fasta"):
-        seq = str(record.seq)
-
-        aa_list.append(seq)
+        aa_list.append(str(record.seq))
+        if codes:
+            code_list.append(type2p_code(record.description))  # TODO: make this work with other codes too
 
     x_data = list(map(aa2hot, aa_list))
 
-    return x_data, None
+    if codes:
+        y_data = code_list
+    else:
+        y_data = None
+
+    return x_data, y_data
 
 
 def tab_parser(filename, codes=False):
@@ -222,7 +195,7 @@ def tab_parser(filename, codes=False):
     x_data = raw_data.sequence.apply(aa2hot).tolist()
 
     if codes:
-        pos_data = raw_data[raw_data['codes']>0]
+        pos_data = raw_data[raw_data['codes'] > 0]
         y_data = pos_data.codes.tolist()
         y_data = [y+1 for y in y_data]
         x_data = pos_data.sequence.apply(aa2hot).tolist()

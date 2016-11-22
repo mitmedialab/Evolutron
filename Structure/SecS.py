@@ -109,7 +109,7 @@ def main(**options):
     # Load the dataset
     print("Loading data...")
     dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories'])
-    dataset = load_dataset(**dataset_options)
+    dataset = load_dataset(**dataset_options, i_am_kfir=True)
 
     options['nb_categories'] = dataset_options['nb_categories']
     supervised(dataset[0], dataset[1], handle, **options)
