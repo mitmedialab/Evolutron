@@ -60,7 +60,7 @@ def supervised(x_data, y_data, handle,
         raise TypeError('Something went wrong with the dataset type')
 
     if model:
-        conv_net = DeepTrainer(DeepCoDER.from_saved_model(model))
+        conv_net = DeepCoDER.from_saved_model(model)
         print('Loaded model')
     else:
         print('Building model ...')
@@ -104,6 +104,7 @@ def main(**options):
         handle = Handle.from_filename(options.get('model'))
         #assert handle.program == 'SecS', 'The model file provided is for another program.'
     else:
+        options['filters'] = time.time()
         handle = Handle(**options)
 
     # Load the dataset

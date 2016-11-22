@@ -3,7 +3,7 @@ try:
     from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
 except Exception: #ImportError
     from extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
-from keras.models import Model, load_model
+from keras.models import Model, load_model, model_from_json
 from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
 from keras.utils.visualize_util import model_to_dot
@@ -12,10 +12,18 @@ from keras.objectives import categorical_crossentropy, mse
 from keras.callbacks import TensorBoard
 import keras.backend as K
 
-from IPython.display import SVG
+try:
+    from evolutron.engine import DeepTrainer
+    from evolutron.tools import load_dataset, Handle, shape
+    from evolutron.networks import custom_layers
+except ImportError:
+    sys.path.insert(0, os.path.abspath('..'))
+    from evolutron.engine import DeepTrainer
+    from evolutron.tools import load_dataset, Handle, shape
+    from evolutron.networks import custom_layers
 
 import numpy as np
-import argparse
+import argparse, sys, os, h5py
 
 class DeepCoDER(Model):
     def __init__(self, input, output, name=None):
@@ -34,9 +42,16 @@ class DeepCoDER(Model):
 
     @classmethod
     def from_saved_model(cls, filepath):
-        cls.__dict__ = load_model(filepath)
+        # First load model architecture
+        hf = h5py.File(filepath)
+        model_config = hf.attrs['model_config'].decode('utf8')
+        hf.close()
+        net = DeepTrainer(model_from_json(model_config, custom_objects=custom_layers))
+
+        return net
+        """cls.__dict__ = load_model(filepath)
         cls.__class__ = DeepCoDER
-        return cls
+        return cls"""
 
     def save(self, filepath, overwrite=True):
         self.__class__.__name__ = 'Model'
@@ -146,10 +161,8 @@ class DeepCoDER(Model):
     @staticmethod
     def _loss_function(y_true, y_pred):
         nb_categories = K.shape(y_true)[-1]
-        print(K.shape(y_true), K.shape(y_pred))
         return K.mean(categorical_crossentropy(K.reshape(y_true, shape=(-1, nb_categories)),
                                                K.reshape(y_pred, shape=(-1, nb_categories))))
-        #return mse(y_true, y_pred)
 
     @staticmethod
     def mean_cat_acc(y_true, y_pred):
