@@ -36,7 +36,7 @@ def pad_or_clip(x, n):
         return x[:n, :]
 
 
-def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_options):
+def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False, **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
     try:
@@ -58,21 +58,25 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
 
     if padded:
         if not max_aa:
-            max_aa = int(np.percentile([len(x) for x in x_data], 99))
+            max_aa = int(np.percentile([len(x) for x in x_data], 99))  # pad so that 99% of datapoints are complete
         else:
             max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
         x_data = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
-        try:
-            y_data = np.asarray([pad_or_clip(y, max_aa) for y in y_data])
-        except:
-            pass
+
+        if i_am_kfir:
+            try:
+                y_data = np.asarray([pad_or_clip(y, max_aa) for y in y_data])
+            except:
+                pass
+
+    data_size = len(x_data)
 
     if not y_data.any():
         # Unsupervised Learning
         # x_data: observations
 
-        print('Dataset size: {0}'.format(len(x_data)))
+        print('Dataset size: {0}'.format(data_size))
         return x_data
     else:
         # Supervised Learning
@@ -81,11 +85,7 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
         try:
             assert (len(x_data) == len(y_data))
         except AssertionError:
-            print('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data)))
-            raise IOError
-
-        data_size = len(x_data)
+            raise IOError('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data)))
 
         print('Dataset size: {0}'.format(data_size))
-
         return x_data, np.asarray(y_data, dtype=np.int32)

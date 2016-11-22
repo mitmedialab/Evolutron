@@ -3,8 +3,6 @@ from Bio import SeqIO
 
 import csv
 
-
-
 def get_aa_seqs():  # Getting bulk sequence data from NCBI
     Entrez.email = "karydis@media.mit.edu"
     infile = 'datasets/m6a_aa.csv'
@@ -19,7 +17,7 @@ def get_aa_seqs():  # Getting bulk sequence data from NCBI
     data = list(data)
 
     for i, d in enumerate(data[19137:]):
-        print i, d['gbid']
+        print(i, d['gbid'])
         if not d['gbid'] == "['']":
             handle = Entrez.efetch(db="nuccore",
                                    id=d['gbid'],
