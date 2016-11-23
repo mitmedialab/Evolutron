@@ -57,7 +57,6 @@ def motif_extraction(motif_fun, x_data, filters, filter_length, handle, depth):
         del seq_scores
 
     max_seq_scores = np.concatenate(max_seq_scores).transpose((2, 0, 1))
-
     # noinspection PyUnusedLocal
     matches = [[] for i in range(filters)]
     for k, filt in enumerate(max_seq_scores):
