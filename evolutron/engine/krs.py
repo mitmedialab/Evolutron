@@ -407,7 +407,7 @@ class DeepTrainer:
 
     def save_train_history(self, handle):
         handle.ftype = 'history'
-        handle.epochs = len(self.train_loss)
+        handle.epochs = len(self.history.epoch)
 
         filename = 'models/' + handle
         if not os.path.exists('/'.join(filename.split('/')[:-1])):
