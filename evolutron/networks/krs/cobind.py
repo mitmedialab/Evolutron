@@ -14,7 +14,6 @@
 import keras.backend as K
 from keras.layers import Input
 from keras.models import Model, load_model
-from keras.metrics import categorical_accuracy
 
 from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten  # To implement masking
 
@@ -56,14 +55,14 @@ class DeepDNABind(Model):
         # Convolutional Layers
         convs = [Convolution1D(nb_filter, filter_length,
                                init='glorot_uniform',
-                               activation='relu',
+                               activation='sigmoid',
                                border_mode='same',
                                name='Conv1')(inp)]
 
         for c in range(1, n_conv_layers):
             convs.append(Convolution1D(nb_filter, filter_length,
                                        init='glorot_uniform',
-                                       activation='relu',
+                                       activation='sigmoid',
                                        border_mode='same',
                                        name='Conv{}'.format(c + 1))(convs[-1]))  # maybe add L1 regularizer
 
