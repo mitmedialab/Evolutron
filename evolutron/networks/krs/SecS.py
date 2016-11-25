@@ -49,12 +49,11 @@ class DeepCoDER(Model):
         hf = h5py.File(filepath)
         model_config = hf.attrs['model_config'].decode('utf8')
         hf.close()
-        net = DeepTrainer(model_from_json(model_config, custom_objects=custom_layers))
+        model = model_from_json(model_config, custom_objects=custom_layers)
 
-        return net
-        """cls.__dict__ = load_model(filepath)
-        cls.__class__ = DeepCoDER
-        return cls"""
+        #args['name'] = cls.__class__.__name__
+
+        return cls(model.input, model.output, name='SecSDeepCoDER')
 
     def save(self, filepath, overwrite=True):
         self.__class__.__name__ = 'Model'
