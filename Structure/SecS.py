@@ -60,7 +60,7 @@ def supervised(x_data, y_data, handle,
         raise TypeError('Something went wrong with the dataset type')
 
     if model:
-        conv_net = DeepCoDER.from_saved_model(model)
+        net_arch = DeepCoDER.from_saved_model(model)
         print('Loaded model')
     else:
         print('Building model ...')
@@ -73,19 +73,20 @@ def supervised(x_data, y_data, handle,
                                            nb_categories=nb_categories,
                                           dilation=dilation)
         handle.model = 'realDeepCoDER'
-        conv_net = DeepTrainer(net_arch)
-        conv_net.compile(optimizer=optimizer, lr=rate)
+
+    conv_net = DeepTrainer(net_arch)
+    conv_net.compile(optimizer=optimizer, lr=rate)
 
     conv_net.display_network_info()
 
     print('Started training at {}'.format(time.asctime()))
 
-    conv_net.fit(x_data, y_data,
+    """conv_net.fit(x_data, y_data,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
                  patience=500
-                 )
+                 )"""
 
     print('Testing model ...')
     score = conv_net.score(x_data, y_data)
