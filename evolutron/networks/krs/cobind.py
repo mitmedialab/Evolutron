@@ -12,10 +12,11 @@
     liability.
 """
 import keras.backend as K
+from keras.layers import GlobalMaxPooling1D
 from keras.layers import Input
 from keras.models import Model, load_model
-from keras.layers import GlobalMaxPooling1D
-from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten  # To implement masking
+
+from .extra_layers import Convolution1D, MaxPooling1D, Dense  # To implement masking
 
 
 class DeepDNABind(Model):
@@ -26,6 +27,12 @@ class DeepDNABind(Model):
 
     @classmethod
     def from_options(cls, input_shape, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
+
+        if not isinstance(n_filters, list):
+            n_filters = [n_filters for _ in range(n_conv_layers)]
+        if not isinstance(filter_length, list):
+            filter_length = [filter_length for _ in range(n_conv_layers)]
+
         args = cls._build_network(input_shape, n_conv_layers, n_fc_layers, n_filters, filter_length)
 
         args['name'] = cls.__class__.__name__
@@ -54,11 +61,9 @@ class DeepDNABind(Model):
 
         # Convolutional Layers
         convs = []
-        
+
         max_pools = [inp]
-        print(nb_filter)
-        print(filter_length)
-        for c in range(0, n_conv_layers-1):
+        for c in range(0, n_conv_layers - 1):
             convs.append(Convolution1D(nb_filter[c], filter_length[c],
                                        init='glorot_uniform',
                                        activation='sigmoid',
@@ -66,12 +71,12 @@ class DeepDNABind(Model):
                                        name='Conv{}'.format(c + 1))(max_pools[-1]))  # maybe add L1 regularizer
             max_pools.append(MaxPooling1D(pool_length=3)(convs[-1]))
 
-        convs.append(Convolution1D(nb_filter[n_conv_layers-1], filter_length[n_conv_layers-1],
-                                       init='glorot_uniform',
-                                       activation='sigmoid',
-                                       border_mode='same',
-                                       name='Conv{}'.format(n_conv_layers))(max_pools[-1]))  # maybe add L1 regularizer
-        
+        convs.append(Convolution1D(nb_filter[n_conv_layers - 1], filter_length[n_conv_layers - 1],
+                                   init='glorot_uniform',
+                                   activation='sigmoid',
+                                   border_mode='same',
+                                   name='Conv{}'.format(n_conv_layers))(max_pools[-1]))  # maybe add L1 regularizer
+
         max_pools.append(GlobalMaxPooling1D()(convs[-1]))
 
         #flat = Flatten()(max_pools[-1])
@@ -79,7 +84,7 @@ class DeepDNABind(Model):
         # Fully-Connected encoding layers
         fc_enc = [max_pools[-1]]
 
-        for d in range(0, n_fc_layers-1):
+        for d in range(0, n_fc_layers - 1):
             fc_enc.append(Dense(256,
                                 init='glorot_uniform',
                                 activation='sigmoid',
