@@ -14,7 +14,7 @@
 import keras.backend as K
 from keras.layers import Input
 from keras.models import Model, load_model
-
+from keras.layers import GlobalMaxPooling1D
 from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten  # To implement masking
 
 
@@ -53,36 +53,42 @@ class DeepDNABind(Model):
         inp = Input(shape=input_shape, name='aa_seq')
 
         # Convolutional Layers
-        convs = [Convolution1D(nb_filter, filter_length,
-                               init='glorot_uniform',
-                               activation='sigmoid',
-                               border_mode='same',
-                               name='Conv1')(inp)]
-
-        for c in range(1, n_conv_layers):
-            convs.append(Convolution1D(nb_filter, filter_length,
+        convs = []
+        
+        max_pools = [inp]
+        print(nb_filter)
+        print(filter_length)
+        for c in range(0, n_conv_layers-1):
+            convs.append(Convolution1D(nb_filter[c], filter_length[c],
                                        init='glorot_uniform',
                                        activation='sigmoid',
                                        border_mode='same',
-                                       name='Conv{}'.format(c + 1))(convs[-1]))  # maybe add L1 regularizer
+                                       name='Conv{}'.format(c + 1))(max_pools[-1]))  # maybe add L1 regularizer
+            max_pools.append(MaxPooling1D(pool_length=3)(convs[-1]))
 
-        # Max-pooling
-        max_pool = MaxPooling1D(pool_length=seq_length)(convs[-1])
-        flat = Flatten()(max_pool)
+        convs.append(Convolution1D(nb_filter[n_conv_layers-1], filter_length[n_conv_layers-1],
+                                       init='glorot_uniform',
+                                       activation='sigmoid',
+                                       border_mode='same',
+                                       name='Conv{}'.format(n_conv_layers))(max_pools[-1]))  # maybe add L1 regularizer
+        
+        max_pools.append(GlobalMaxPooling1D()(convs[-1]))
+
+        #flat = Flatten()(max_pools[-1])
 
         # Fully-Connected encoding layers
-        fc_enc = [Dense(nb_filter,
-                        init='glorot_uniform',
-                        activation='sigmoid',
-                        name='FCEnc1')(flat)]
+        fc_enc = [max_pools[-1]]
 
-        for d in range(1, n_fc_layers):
-            fc_enc.append(Dense(nb_filter,
+        for d in range(0, n_fc_layers-1):
+            fc_enc.append(Dense(256,
                                 init='glorot_uniform',
                                 activation='sigmoid',
                                 name='FCEnc{}'.format(d + 1))(fc_enc[-1]))
 
-        encoded = fc_enc[-1]  # To access if model for encoding needed
+        encoded = Dense(64,
+                        init='glorot_uniform',
+                        activation='sigmoid',
+                        name='FCEnc{}'.format(n_fc_layers))(fc_enc[-1])
 
         classifier = []
         for i in range(0, 6):
