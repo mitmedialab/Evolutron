@@ -168,7 +168,8 @@ class DeepTrainer:
         self.history = self.network.history
 
         print(
-            'Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.train_loss), time.time() - start_time))
+            'Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
+                                                                        time.time() - start_time))
 
     def k_fold(self, x_data, y_data, epochs=1, num_folds=10, stratify=False):
 

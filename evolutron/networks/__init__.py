@@ -2,7 +2,7 @@
 
 from .krs.comet import DeepCoDER, DeepCoFAM
 
-from .krs.cobind import DeepDNABind
+from .krs.cobind import DeepDNABindN
 
 from .krs import extra_layers as extra
 
