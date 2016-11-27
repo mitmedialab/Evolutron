@@ -180,21 +180,26 @@ def fasta_parser(filename, codes=False):
     return x_data, y_data
 
 
-def tab_parser(filename, codes=False):
+def tab_parser(filename, codes=False, key='fam', shuffle=True):
     try:
         raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
-    except IOError:
+    except FileNotFoundError:
         raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
         raw_data.columns = raw_data.columns.str.strip().str.lower().str.replace(' ', '_')
-        pf = raw_data['protein_families'].astype('category')
-        raw_data['codes'] = pf.cat.codes
+        raw_data['fam'] = raw_data['protein_families'].apply(fam)
+        raw_data['sup'] = raw_data['protein_families'].apply(supfam)
+        raw_data['sub'] = raw_data['protein_families'].apply(subfam)
+
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
 
-    raw_data = raw_data.sample(frac=1).reset_index(drop=True)
+    if shuffle:
+        raw_data = raw_data.sample(frac=1).reset_index(drop=True)
 
     x_data = raw_data.sequence.apply(aa2hot).tolist()
 
     if codes:
+        pf = raw_data[key].astype('category')
+        raw_data['codes'] = pf.cat.codes
         pos_data = raw_data[raw_data['codes'] > 0]
         y_data = pos_data.codes.tolist()
         y_data = [y+1 for y in y_data]
@@ -328,3 +333,33 @@ class Handle(object):
         obj = cls(epochs, batch_size, filters, filter_size, data_id=dataset, model=model, ftype=ftype)
 
         return obj
+
+
+def fam(x):
+    dt = str(x).split(',')
+    f = [d for d in dt if d.find(' family') >= 0]
+
+    try:
+        return f[0]
+    except IndexError:
+        return "Unassigned"
+
+
+def supfam(x):
+    dt = str(x).split(',')
+    f = [d for d in dt if d.find('superfamily') >= 0]
+
+    try:
+        return f[0]
+    except IndexError:
+        return "Unassigned"
+
+
+def subfam(x):
+    dt = str(x).split(',')
+    f = [d for d in dt if d.find('subfamily') >= 0]
+
+    try:
+        return f[0]
+    except IndexError:
+        return "Unassigned"
