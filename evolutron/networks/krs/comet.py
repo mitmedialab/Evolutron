@@ -149,11 +149,11 @@ class DeepCoFAM(Model):
         super(DeepCoFAM, self).__init__(input, output, name)
         self.metrics = [self.mean_cat_acc]
 
+        self.name = self.__class__.__name__
+
     @classmethod
     def from_options(cls, input_shape, output_dim, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
         args = cls._build_network(input_shape, output_dim, n_conv_layers, n_fc_layers, n_filters, filter_length)
-
-        args['name'] = cls.__class__.__name__
 
         return cls(**args)
 
@@ -224,8 +224,6 @@ class DeepCoFAM(Model):
 
     @staticmethod
     def _loss_function(y_true, y_pred):
-        print(y_pred._keras_shape)
-        print(y_true._keras_shape)
         loss = categorical_crossentropy(y_pred, y_true)
         return loss
 
