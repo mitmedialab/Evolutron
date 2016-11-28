@@ -81,12 +81,12 @@ def supervised(x_data, y_data, handle,
 
     print('Started training at {}'.format(time.asctime()))
 
-    """conv_net.fit(x_data, y_data,
+    conv_net.fit(x_data, y_data,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
                  patience=500
-                 )"""
+                 )
 
     print('Testing model ...')
     score = conv_net.score(x_data, y_data)
