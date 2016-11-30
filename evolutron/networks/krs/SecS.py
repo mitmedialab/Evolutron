@@ -1,4 +1,4 @@
-from keras.layers import Input, LSTM, Activation, Dropout, Masking
+from keras.layers import Input, LSTM, Activation, Dropout, Masking, merge
 try:
     from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
 except Exception: #ImportError
@@ -60,7 +60,7 @@ class DeepCoDER(Model):
         super(DeepCoDER, self).save(filepath, overwrite=overwrite)
 
     @staticmethod
-    def _build_network(input_shape, n_conv_layers, n_fc_layers, use_lstm, nb_filter,
+    def _build_network(input_shape, n_conv_layers, n_fc_layers, n_lstm, nb_filter,
                        filter_length, nb_categories, dilation=1):
         assert len(input_shape) == 2, 'Unrecognizable input dimensions'
         assert K.image_dim_ordering() == 'tf', 'Theano dimension ordering not supported yet'
@@ -74,7 +74,7 @@ class DeepCoDER(Model):
         mask = Masking(mask_value=0.0)(inp)
 
         # Convolutional Layers
-        """convs = [AtrousConvolution1D(nb_filter, filter_length,
+        convs = [AtrousConvolution1D(nb_filter, filter_length,
                                      atrous_rate=1,
                                      init='glorot_uniform',
                                      activation='relu',
@@ -84,20 +84,6 @@ class DeepCoDER(Model):
         for c in range(1, n_conv_layers):
             convs.append(AtrousConvolution1D(nb_filter, filter_length,
                                              atrous_rate=dilation^c,
-                                             init='glorot_uniform',
-                                             activation='relu',
-                                             border_mode='same',
-                                             name='Conv{}'.format(c + 1))(convs[-1]))"""
-
-        # Convolutional Layers
-        convs = [Convolution1D(nb_filter, filter_length,
-                                     init='glorot_uniform',
-                                     activation='relu',
-                                     border_mode='same',
-                                     name='Conv1')(mask)]
-
-        for c in range(1, n_conv_layers):
-            convs.append(Convolution1D(nb_filter, filter_length,
                                              init='glorot_uniform',
                                              activation='relu',
                                              border_mode='same',
@@ -115,15 +101,30 @@ class DeepCoDER(Model):
         """
 
         if n_conv_layers:
-            lstm = LSTM(output_dim=nb_categories, #input_shape=(-1, seq_length, alphabet),
+            lstm1 = LSTM(output_dim=nb_categories,
                         return_sequences=True, W_regularizer=None)(convs[-1])
+            lstm2 = LSTM(output_dim=nb_categories, go_backwards=True,
+                        return_sequences=True, W_regularizer=None)(convs[-1])
+            lstm3 = LSTM(output_dim=nb_categories, go_backwards=True,
+                        return_sequences=True, W_regularizer=None)(lstm1)
         else:
-            lstm = LSTM(output_dim=nb_categories,  # input_shape=(-1, seq_length, alphabet),
-                        return_sequences=True, W_regularizer=None)(mask)
+            lstm1 = LSTM(output_dim=nb_categories,
+                         return_sequences=True, W_regularizer=None)(mask)
+            lstm2 = LSTM(output_dim=nb_categories, go_backwards=True,
+                         return_sequences=True, W_regularizer=None)(mask)
+            lstm3 = LSTM(output_dim=nb_categories, go_backwards=True,
+                         return_sequences=True, W_regularizer=None)(lstm1)
+
+        #merging forward and backward lstms
+        merge_layer = merge([lstm1, lstm2], mode='sum')
 
         #flat = Reshape(target_shape=(-1, K.shape(lstm)[-1]))(lstm)
-        if use_lstm:
-            flat = Flatten()(lstm)
+        if n_lstm == 1:
+            flat = Flatten()(lstm1)
+        elif n_lstm == 2:
+            flat = Flatten()(lstm3)
+        elif n_lstm == 11:
+            flat = Flatten()(merge_layer)
         else:
             flat = Flatten()(convs[-1])
 
@@ -153,8 +154,12 @@ class DeepCoDER(Model):
         # Softmaxing
         if n_fc_layers:
             output = Activation(activation='softmax')(unflat)
-        elif use_lstm:
-            output = Activation(activation='softmax')(lstm)
+        elif n_lstm == 1:
+            output = Activation(activation='softmax')(lstm1)
+        elif n_lstm == 2:
+            output = Activation(activation='softmax')(lstm3)
+        elif n_lstm == 11:
+            output = Activation(activation='softmax')(merge_layer)
         else:
             output = Activation(activation='softmax')(convs[-1])
 
