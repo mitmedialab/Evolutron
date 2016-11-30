@@ -87,7 +87,7 @@ def supervised(x_data, y_data, handle,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
-                 patience=500,
+                 patience=50,
                  )
 
     print('Testing model ...')
@@ -96,11 +96,23 @@ def supervised(x_data, y_data, handle,
 
     print('Testing model with CB513...')
     x_data, y_data = load_dataset(data_id='cb513', i_am_kfir=True)
-    score = conv_net.score(x_data, y_data)
-    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
+    cb513_score = conv_net.score(x_data, y_data)
+    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(cb513_score[0], 100 * cb513_score[1]))
+
+    print('Testing model with CASP10...')
+    x_data, y_data = load_dataset(data_id='casp10', i_am_kfir=True)
+    casp10_score = conv_net.score(x_data, y_data)
+    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp10_score[0], 100 * casp10_score[1]))
+
+    print('Testing model with CASP11...')
+    x_data, y_data = load_dataset(data_id='casp11', i_am_kfir=True)
+    casp11_score = conv_net.score(x_data, y_data)
+    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp11_score[0], 100 * casp11_score[1]))
 
     conv_net.save_train_history(handle)
     conv_net.save_model_to_file(handle)
+
+    return score, cb513_score, casp10_score, casp11_score, handle
 
 
 def get_args(kwargs, args):
@@ -121,7 +133,7 @@ def main(**options):
     dataset = load_dataset(**dataset_options, i_am_kfir=True)
 
     options['nb_categories'] = dataset_options['nb_categories']
-    supervised(dataset[0], dataset[1], handle, **options)
+    return supervised(dataset[0], dataset[1], handle, **options)
 
 
 

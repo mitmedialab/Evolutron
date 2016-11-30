@@ -58,7 +58,7 @@ class DeepTrainer:
         opts = {'sgd': opt.SGD(lr=options.get('lr', .01),
                                decay=options.get('decay', 1e-6),
                                momentum=options.get('momentum', 0.9), nesterov=True,
-                               clipnorm=options.get('clipnorm', None)),
+                               clipnorm=options.get('clipnorm', 0)),
                 'rmsprop': opt.RMSprop(lr=options.get('lr', .001)),
                 'adadelta': opt.Adadelta(lr=options.get('lr', 1.)),
                 'adagrad': opt.Adagrad(lr=options.get('lr', .01)),
