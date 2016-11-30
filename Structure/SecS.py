@@ -48,7 +48,8 @@ def supervised(x_data, y_data, handle,
                nb_categories=8,
                dilation=1,
                model=None,
-               mode=None):
+               mode=None,
+               clipnorm=None):
 
     filters = nb_categories
 
@@ -76,7 +77,7 @@ def supervised(x_data, y_data, handle,
         handle.model = 'realDeepCoDER'
 
     conv_net = DeepTrainer(net_arch)
-    conv_net.compile(optimizer=optimizer, lr=rate, mode=mode)
+    conv_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
 
     conv_net.display_network_info()
 
@@ -86,7 +87,7 @@ def supervised(x_data, y_data, handle,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
-                 patience=500
+                 patience=500,
                  )
 
     print('Testing model ...')
@@ -94,8 +95,8 @@ def supervised(x_data, y_data, handle,
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
     print('Testing model with CB513...')
-    dataset = load_dataset(data_id='cb513', i_am_kfir=True)
-    score = conv_net.score(**dataset)
+    x_data, y_data = load_dataset(data_id='cb513', i_am_kfir=True)
+    score = conv_net.score(x_data, y_data)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
     conv_net.save_train_history(handle)
