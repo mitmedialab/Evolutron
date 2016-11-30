@@ -17,7 +17,9 @@ file_db = {
     'smallSecS': 'smallSecS.sec',
     'cullPDB': 'cullpdb+profile_6133_filtered.npy.gz',
     'cb513': 'cb513+profile_split1.npy.gz',
-    'human_ors': 'uniprot_human_ors.tsv'
+    'human_ors': 'uniprot_human_ors.tsv',
+    'casp10': 'casp10.sec',
+    'casp11': 'casp11.sec'
 }
 
 
