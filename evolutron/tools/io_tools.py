@@ -202,7 +202,7 @@ def tab_parser(filename, codes=False, key='fam', shuffle=True):
         raw_data['codes'] = pf.cat.codes
         pos_data = raw_data[raw_data['codes'] > 0]
         y_data = pos_data.codes.tolist()
-        y_data = [y+1 for y in y_data]
+        y_data = [y + 1 for y in y_data]
         x_data = pos_data.sequence.apply(aa2hot).tolist()
     else:
         y_data = None
@@ -254,8 +254,8 @@ def npz_parser(filename, nb_categories=8, dummy_option=None):
 
     data = np.reshape(data[:], (-1, 700, 57))
 
-    x_data = data[:,:,:22]
-    y_data = data[:,:,22:30]
+    x_data = data[:, :, :22]
+    y_data = data[:, :, 22:30]
 
     return x_data, y_data
 
@@ -266,16 +266,16 @@ class Handle(object):
 
     def __init__(self,
                  epochs=None,
-                 batch_size=None,
                  filters=None,
                  filter_length=None,
                  model=None,
                  ftype=None,
                  program=None,
                  data_id=None,
+                 conv=None,
+                 fc=None,
                  **kwargs):
         self.epochs = epochs
-        self.batch_size = batch_size
         self.filters = filters
         self.filter_size = filter_length
 
@@ -284,25 +284,30 @@ class Handle(object):
         self.program = program
         self.dataset = data_id
 
+        self.n_convs = conv
+        self.n_fc = fc
+
         self.filename = str(self).split('/')[-1]
 
     def __str__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
-                                                    self.filters,
-                                                    self.filter_size,
-                                                    self.epochs,
-                                                    self.batch_size,
-                                                    self.model,
-                                                    self.ftype)
+        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.dataset,
+                                                        self.filters,
+                                                        self.filter_size,
+                                                        self.epochs,
+                                                        self.n_convs,
+                                                        self.model,
+                                                        self.ftype,
+                                                        self.n_fc)
 
     def __repr__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{5}.{6}'.format(self.dataset,
-                                                    self.filters,
-                                                    self.filter_size,
-                                                    self.epochs,
-                                                    self.batch_size,
-                                                    self.model,
-                                                    self.ftype)
+        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.dataset,
+                                                        self.filters,
+                                                        self.filter_size,
+                                                        self.epochs,
+                                                        self.n_convs,
+                                                        self.model,
+                                                        self.ftype,
+                                                        self.n_fc)
 
     def __add__(self, other):
         return str(self) + other
@@ -320,17 +325,12 @@ class Handle(object):
 
         info = basename.split('/')[-1]
 
-        try:
-            filters, filter_size, epochs, batch_size = map(int, info.split('_')[:4])
-        except ValueError:
-            filters, filter_size, epochs, batch_size = info.split('_')[:4]
-            filter_size = int(filter_size)
-            epochs = int(epochs)
-            batch_size = int(batch_size)
+        filters, filter_size, epochs, conv, fc = map(eval, info.split('_')[:5])
 
         model = info.split('_')[-1]
 
-        obj = cls(epochs, batch_size, filters, filter_size, data_id=dataset, model=model, ftype=ftype)
+        obj = cls(epochs=epochs, filters=filters, filter_length=filter_size, conv=conv, fc=fc,
+                  data_id=dataset, model=model, ftype=ftype)
 
         return obj
 
