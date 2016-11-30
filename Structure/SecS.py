@@ -47,7 +47,8 @@ def supervised(x_data, y_data, handle,
                lstm=1,
                nb_categories=8,
                dilation=1,
-               model=None):
+               model=None,
+               mode=None):
 
     filters = nb_categories
 
@@ -75,7 +76,7 @@ def supervised(x_data, y_data, handle,
         handle.model = 'realDeepCoDER'
 
     conv_net = DeepTrainer(net_arch)
-    conv_net.compile(optimizer=optimizer, lr=rate)
+    conv_net.compile(optimizer=optimizer, lr=rate, mode=mode)
 
     conv_net.display_network_info()
 
@@ -90,6 +91,11 @@ def supervised(x_data, y_data, handle,
 
     print('Testing model ...')
     score = conv_net.score(x_data, y_data)
+    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
+
+    print('Testing model with CB513...')
+    dataset = load_dataset(data_id='cb513', i_am_kfir=True)
+    score = conv_net.score(**dataset)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
     conv_net.save_train_history(handle)
@@ -135,8 +141,6 @@ if __name__ == '__main__':
     parser.add_argument("--no_pad", action='store_true',
                         help='Toggle to pad protein sequences. Batch size auto-change to 1.')
 
-    #parser.add_argument("--mode", choices=['transfer', 'unsupervised', 'supervised'], default='unsupervised')
-
     parser.add_argument("--conv", type=int,
                         help='number of conv layers.')
 
@@ -155,6 +159,9 @@ if __name__ == '__main__':
     parser.add_argument("--rate", type=float,
                         help='The learning rate for the optimizer.')
 
+    parser.add_argument("--clipnorm", type=float,
+                        help='Clipping the gradient norm for the optimizer.')
+
     parser.add_argument("--model", type=str,
                         help='Continue training the given model. Other architecture options are unused.')
 
@@ -169,6 +176,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--validation', type=float, default=.2,
                         help='validation set size?')
+
+    parser.add_argument("--mode", choices=['NaNGuardMode', 'None'],
+                        help='Theano mode to be used.')
 
     args = parser.parse_args()
 

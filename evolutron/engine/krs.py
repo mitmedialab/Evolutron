@@ -15,6 +15,11 @@ from keras.callbacks import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from tabulate import tabulate
 
+try:
+    from theano.compile.nanguardmode import NanGuardMode
+except:
+    pass
+
 
 # TODO: implement enhanced progbar logger
 
@@ -52,19 +57,25 @@ class DeepTrainer:
 
         opts = {'sgd': opt.SGD(lr=options.get('lr', .01),
                                decay=options.get('decay', 1e-6),
-                               momentum=options.get('momentum', 0.9), nesterov=True),
+                               momentum=options.get('momentum', 0.9), nesterov=True,
+                               clipnorm=options.get('clipnorm', None)),
                 'rmsprop': opt.RMSprop(lr=options.get('lr', .001)),
                 'adadelta': opt.Adadelta(lr=options.get('lr', 1.)),
                 'adagrad': opt.Adagrad(lr=options.get('lr', .01)),
                 'adam': opt.Adam(lr=options.get('lr', .001)),
-                'nadam': opt.Nadam(lr=options.get('lr', .002)),
+                'nadam': opt.Nadam(lr=options.get('lr', .002),
+                                   clipnorm=options.get('clipnorm', None)),
                 'adamax': opt.Adamax(lr=options.get('lr', .002))
                 }
+
+        mode = {'NaNGuardMode': NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True),
+                None: None}
 
         self.network.compile(loss=self.network._loss_function,
                              loss_weights=options.get('loss_weights', None),
                              optimizer=opts[optimizer],
-                             metrics=self.network.metrics)
+                             metrics=self.network.metrics,
+                             mode=mode[options.get('mode', None)])
         self._create_functions()
 
     def _create_functions(self):
