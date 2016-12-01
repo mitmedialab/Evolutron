@@ -28,8 +28,7 @@ class DeepTrainer:
     def __init__(self,
                  network,
                  classification=False,
-                 verbose=False,
-                 patience=True):
+                 verbose=False):
 
         self.verbose = verbose
 
@@ -38,8 +37,6 @@ class DeepTrainer:
         self.output = network.output
 
         self.classification = classification
-
-        self.patience = patience
 
         self.history = None
         self.train_loss = []
@@ -64,7 +61,7 @@ class DeepTrainer:
                 'adagrad': opt.Adagrad(lr=options.get('lr', .01)),
                 'adam': opt.Adam(lr=options.get('lr', .001)),
                 'nadam': opt.Nadam(lr=options.get('lr', .002),
-                                   clipnorm=options.get('clipnorm', None)),
+                                   clipnorm=options.get('clipnorm', 0)),
                 'adamax': opt.Adamax(lr=options.get('lr', .002))
                 }
 
@@ -149,7 +146,7 @@ class DeepTrainer:
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
         reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
-                                      patience=patience-3, min_lr=0.001, verbose=1)
+                                      patience=patience - 5, min_lr=0.001, verbose=1)
         rn = np.random.random()
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
                                      save_best_only=True, save_weights_only=True)
@@ -183,120 +180,7 @@ class DeepTrainer:
                                                                         time.time() - start_time))
 
     def k_fold(self, x_data, y_data, epochs=1, num_folds=10, stratify=False):
-
-        self._create_functions()
-
-        if self.classification and stratify:
-            folds = StratifiedKFold(y_data, n_folds=num_folds)
-        else:
-            folds = KFold(len(x_data), n_folds=num_folds)
-
-        self.fold_val_losses = np.zeros((num_folds, epochs))
-        self.fold_train_losses = np.zeros((num_folds, epochs))
-
-        foldit = 0
-        for train_idx, valid_idx in folds:
-            print('Starting Fold {0}'.format(foldit + 1))
-
-            if isinstance(x_data, np.ndarray):
-                train_set_x = x_data.take(train_idx, axis=0)
-                valid_set_x = x_data.take(valid_idx, axis=0)
-            else:
-                train_set_x = [x_data[i] for i in train_idx]
-                valid_set_x = [x_data[i] for i in valid_idx]
-
-            train_set_y = y_data.take(train_idx, axis=0)
-            valid_set_y = y_data.take(valid_idx, axis=0)
-
-            if self.classification:
-                msg = 'Distribution of Examples per set'
-                print(msg)
-                print('-' * len(msg))
-                classes = ['Class ' + str(i) for i in range(len(np.unique(y_data)))]
-                counts = dict()
-                _, c = np.unique(train_set_y, return_counts=True)
-                counts['train'] = c
-                _, c = np.unique(valid_set_y, return_counts=True)
-                counts['valid'] = c
-
-                print(tabulate([['Set'] + classes + ['Total'],
-                                ['Train'] + counts['train'].tolist() + [counts['train'].sum()],
-                                ['Valid'] + counts['valid'].tolist() + [counts['valid'].sum()]],
-                               stralign='center',
-                               headers="firstrow"))
-            else:
-                print('Train:{0}, Valid:{1}'.format(len(train_idx), len(valid_idx)))
-
-            # Early-stopping parameters
-            patience = 50 * len(train_set_x)  # look as this many examples regardless
-            patience_increase = 2  # wait this times much longer when a new best is found
-            improvement_threshold = 0.998  # a relative improvement of this much is considered significant
-            best_validation_loss = np.inf
-            it = 0
-            done_looping = False
-
-            epochs = min(epochs, self.max_epochs)
-            epoch = 0
-            start_time = time.time()
-            print(tabulate([['Epoch', 'Train Loss', 'Val Loss', 'Time']], stralign='center', headers="firstrow"))
-            # We iterate over epochs:
-            while epoch < epochs and not done_looping:
-                epoch += 1
-
-                # In each epoch, we do a full pass over the training data:
-                train_err = []
-                train_acc = []
-                epoch_time = time.time()
-                for X, y in self._iterate_minibatches(train_set_x, train_set_y, self.batch_size):
-                    # print(self.f(X, y))
-                    err, acc = self.train_fn(X, y)
-                    train_err.append(err)
-                    train_acc.append(acc)
-
-                # After that, we do a full pass over the validation data:
-                val_err = []
-                val_acc = []
-                for X, y in self._iterate_minibatches(valid_set_x, valid_set_y, self.batch_size):
-                    err, acc = self.val_fn(X, y)
-                    val_err.append(err)
-                    val_acc.append(acc)
-
-                self.fold_train_losses[foldit, epoch - 1] = (np.mean(train_err))
-                self.fold_val_losses[foldit, epoch - 1] = (np.mean(val_err))
-                print(tabulate([['Epoch', 'Train Loss', 'Val Loss', 'Time'],
-                                ["{}/{}".format(epoch, epochs),
-                                 self.fold_train_losses[foldit, epoch - 1],
-                                 self.fold_val_losses[foldit, epoch - 1],
-                                 "{:.3f}s".format(time.time() - epoch_time)]],
-                               tablefmt='plain', floatfmt=".6f", stralign='center',
-                               headers="firstrow").rsplit('\n', 1)[-1])
-
-                # If we have the best validation score until now
-                if self.fold_val_losses[foldit, epoch - 1] < best_validation_loss:
-
-                    # Increase patience if loss improvement is good enough
-                    if self.fold_val_losses[foldit, epoch - 1] < best_validation_loss * improvement_threshold:
-                        patience = max(patience, it * patience_increase)
-
-                    # save best validation score and iteration number
-                    best_validation_loss = self.fold_val_losses[foldit, epoch - 1]
-
-                # Stop if above early stopping limit
-                it = (epoch - 1) * len(train_set_x)
-                if patience <= it:
-                    done_looping = True
-
-            foldit += 1
-            print(
-                'Fold {2}: Model trained for {0} epochs. Total time: {1:.3f}s'.format(epochs, time.time() - start_time,
-                                                                                      foldit))
-            val_preds = self.predict_proba(valid_set_x)
-            train_preds = self.predict_proba(train_set_x)
-            self.k_fold_history['train_classes'].append(train_set_y)
-            self.k_fold_history['val_classes'].append(valid_set_y)
-            self.k_fold_history['train_preds'].append(train_preds)
-            self.k_fold_history['val_preds'].append(val_preds)
-            self.reset_all_param_values()
+        raise NotImplementedError
 
     def score(self, x_data, y_data, **options):
         return self.network.evaluate(x_data, y_data, verbose=options.pop('verbose', 0), **options)
