@@ -6,11 +6,12 @@ from evolutron.tools import io_tools as io
 file_db = {
     'random': 'random_aa.fasta',
     'type2p': 'type2p_ps_aa.fasta',
-    'c2h2': '',
     'hsapiens': 'sprot_hsapiens_pfam.tsv',
     'ecoli': 'sprot_ecoli_pfam.tsv',
     'zinc': 'sprot_znf_prot_pfam.tsv',
     'homeo': 'sprot_homeo_pfam.tsv',
+    'crispr': 'sprot_crispr_pfam.tsv',
+    'cas9': 'sprot_cas9_pfam.tsv',
     'cd4': 'sprot_cd4_pfam.tsv',
     'dnabind': 'sprot_dna_tf_pfam.tsv',
     'SecS': 'SecS.sec',
