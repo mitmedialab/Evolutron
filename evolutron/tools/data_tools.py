@@ -16,6 +16,7 @@ file_db = {
     'dnabind': 'sprot_dna_tf_pfam.tsv',
     'SecS': 'SecS.sec',
     'smallSecS': 'smallSecS.sec',
+    'tinySecS': 'tinySecS.sec',
     'cullPDB': 'cullpdb+profile_6133_filtered.npy.gz',
     'cb513': 'cb513+profile_split1.npy.gz',
     'human_ors': 'uniprot_human_ors.tsv',
@@ -65,7 +66,11 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False
         if not max_aa:
             max_aa = int(np.percentile([len(x) for x in x_data], 99))  # pad so that 99% of datapoints are complete
         else:
-            max_aa = min(max_aa, np.max([len(x) for x in x_data]))
+            # ToDo: I changed the min to max (seems to make sense), check if that's good for you!
+            if i_am_kfir:
+                max_aa = max(max_aa, np.max([len(x) for x in x_data]))
+            else:
+                max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
         x_data = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
 
@@ -95,3 +100,4 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False
 
         print('Dataset size: {0}'.format(data_size))
         return x_data, np.asarray(y_data, dtype=np.int32)
+
