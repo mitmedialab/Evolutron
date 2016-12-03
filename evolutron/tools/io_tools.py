@@ -244,7 +244,7 @@ def SecS_parser(filename, nb_categories=8, dummy_option=None):
     return x_data, y_data
 
 
-def npz_parser(filename, nb_categories=8, dummy_option=None):
+def npz_parser(filename, nb_categories=8, extra_features=False, dummy_option=None):
     """
         This module parses data from npz files containing sequence and secondary structure
         and transforms them to Evolutron format.
@@ -254,7 +254,11 @@ def npz_parser(filename, nb_categories=8, dummy_option=None):
 
     data = np.reshape(data[:], (-1, 700, 57))
 
-    x_data = data[:, :, :22]
+    if extra_features:
+        idx = np.hstack((np.arange(0, 22), np.arange(35, 57)))
+        x_data = data[:, :, idx]
+    else:
+        x_data = data[:, :, :22]
     y_data = data[:, :, 22:30]
 
     return x_data, y_data

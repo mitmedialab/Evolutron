@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-    SecS - Secondary Structure
+    Embedder
     ------------------------------------------_
-    SecStructure is an automated tool for prediction of protein secondary structure
-     from it's amino acid sequence.
+    Embedder is an unsupervised model to generate AA embeddings.
 
     (c) Massachusetts Institute of Technology
 
@@ -17,12 +16,14 @@ import time
 
 import numpy as np
 
+import keras.backend as K
+
 # Check if package is installed, else fallback to developer mode imports
 try:
     import evolutron.networks as nets
     from evolutron.tools import load_dataset, none2str, Handle
     from evolutron.engine import DeepTrainer
-    from evolutron.networks.krs.SecS import DeepSecS
+    from evolutron.networks.krs.SecS import DeepEmbed
 except ImportError:
     import os
     import sys
@@ -31,22 +32,19 @@ except ImportError:
     import evolutron.networks as nets
     from evolutron.tools import load_dataset, none2str, Handle, shape
     from evolutron.engine import DeepTrainer
-    from evolutron.networks.krs.SecS import DeepSecS
+    from evolutron.networks.krs.SecS import DeepEmbed
 
 
-def supervised(x_data, y_data, handle,
+def unsupervised(train_data, embed_data, handle,
                epochs=10,
                batch_size=128,
-               filters=8,
                filter_length=10,
                validation=.3,
-               optimizer='nadam',
+               optimizer='sgd',
                rate=.01,
                conv=1,
-               fc=1,
                lstm=1,
                nb_categories=8,
-               dilation=1,
                model=None,
                mode=None,
                clipnorm=0):
@@ -54,36 +52,37 @@ def supervised(x_data, y_data, handle,
     filters = nb_categories
 
     # Find input shape
-    if type(x_data) == np.ndarray:
-        input_shape = x_data[0].shape
-    elif type(x_data) == list:
-        input_shape = (None, x_data[0].shape[1])
+    if type(train_data) == np.ndarray:
+        input_shape = train_data[0].shape
+    elif type(train_data) == list:
+        input_shape = (None, train_data[0].shape[1])
     else:
         raise TypeError('Something went wrong with the dataset type')
 
     if model:
-        net_arch = DeepSecS.from_saved_model(model)
+        net_arch = DeepEmbed.from_saved_model(model)
         print('Loaded model')
     else:
         print('Building model ...')
-        net_arch = DeepSecS.from_options(input_shape,
-                                         n_conv_layers=conv,
-                                         n_fc_layers=fc,
-                                         use_lstm=lstm,
-                                         n_filters=filters,
-                                         filter_length=filter_length,
-                                         nb_categories=nb_categories,
-                                         dilation=dilation)
-        handle.model = 'realDeepCoDER'
+        #train_net_arch, embed_net_arch = DeepEmbed.from_options(input_shape,
+        train_net_arch = DeepEmbed.from_options(input_shape,
+                                                                 n_conv_layers=conv,
+                                                                 use_lstm=lstm,
+                                                                 n_filters=filters,
+                                                                 filter_length=filter_length,
+                                                                 nb_categories=nb_categories,
+                                                                 )
+        handle.model = 'realDeepEmbed'
 
-    conv_net = DeepTrainer(net_arch)
-    conv_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
+    train_net = DeepTrainer(train_net_arch)
+    #train_net = DeepTrainer(embed_net_arch)
+    train_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
 
-    conv_net.display_network_info()
+    train_net.display_network_info()
 
     print('Started training at {}'.format(time.asctime()))
 
-    conv_net.fit(x_data, y_data,
+    train_net.fit(train_data, train_data,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
@@ -91,28 +90,16 @@ def supervised(x_data, y_data, handle,
                  )
 
     print('Testing model ...')
-    score = conv_net.score(x_data, y_data)
+    score = train_net.score(train_data, train_data)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
-    print('Testing model with CB513...')
-    x_data, y_data = load_dataset(data_id='cb513', i_am_kfir=True)
-    cb513_score = conv_net.score(x_data, y_data)
-    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(cb513_score[0], 100 * cb513_score[1]))
+    train_net.save_train_history(handle)
+    train_net.save_model_to_file(handle)
 
-    print('Testing model with CASP10...')
-    x_data, y_data = load_dataset(data_id='casp10', i_am_kfir=True, padded=True, max_aa=700)
-    casp10_score = conv_net.score(x_data, y_data)
-    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp10_score[0], 100 * casp10_score[1]))
+    embed_net = K.function([train_net_arch.layers[0].input], [train_net_arch.layers[conv+1].output])
+    embeddings = embed_net([embed_data])[0]
 
-    print('Testing model with CASP11...')
-    x_data, y_data = load_dataset(data_id='casp11', i_am_kfir=True, max_aa=700)
-    casp11_score = conv_net.score(x_data, y_data)
-    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp11_score[0], 100 * casp11_score[1]))
-
-    conv_net.save_train_history(handle)
-    conv_net.save_model_to_file(handle)
-
-    return score, cb513_score, casp10_score, casp11_score, handle
+    return embeddings
 
 
 def get_args(kwargs, args):
@@ -124,29 +111,33 @@ def main(**options):
         handle = Handle.from_filename(options.get('model'))
         #assert handle.program == 'SecS', 'The model file provided is for another program.'
     else:
-        options['filters'] = time.time()
         handle = Handle(**options)
 
     # Load the dataset
     print("Loading data...")
-    dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories', 'extra_features'])
-    dataset = load_dataset(**dataset_options, i_am_kfir=True)
+    train_dataset_options = get_args(options, ['train_data_id', 'padded', 'nb_categories'])
+    train_dataset_options['data_id'] = train_dataset_options['train_data_id']
+    del(train_dataset_options['train_data_id'])
+    train_dataset, _ = load_dataset(**train_dataset_options, i_am_kfir=True)
 
-    options['nb_categories'] = dataset_options['nb_categories']
-    return supervised(dataset[0], dataset[1], handle, **options)
+    embed_dataset_options = get_args(options, ['embed_data_id', 'padded', 'nb_categories'])
+    embed_dataset_options['data_id'] = embed_dataset_options['embed_data_id']
+    del (embed_dataset_options['embed_data_id'])
+    embed_dataset, _ = load_dataset(**embed_dataset_options, i_am_kfir=True, max_aa=train_dataset.shape[1])
 
-
+    options['nb_categories'] = train_dataset_options['nb_categories']
+    return unsupervised(train_dataset, embed_dataset, handle, **options)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='SecS - Convolutional Motif Embeddings Tool',
+    parser = argparse.ArgumentParser(description='Embedder - Embeddings Tool',
                                      argument_default=argparse.SUPPRESS)
 
-    parser.add_argument("data_id",
+    parser.add_argument("train_data_id",
                         help='The protein dataset to be trained on.')
 
-    parser.add_argument("--filters", type=int,
-                        help='Number of filters in the convolutional layers.')
+    parser.add_argument("embed_data_id",
+                        help='The protein dataset to compute embeddings for.')
 
     parser.add_argument("--filter_length", type=int,
                         help='Size of filters in the first convolutional layer.')
@@ -156,9 +147,6 @@ if __name__ == '__main__':
 
     parser.add_argument("--conv", type=int,
                         help='number of conv layers.')
-
-    parser.add_argument("--fc", type=int,
-                        help='number of fc layers.')
 
     parser.add_argument("--lstm", type=int, default=1,
                         help='number of fc layers.')
@@ -184,17 +172,11 @@ if __name__ == '__main__':
     parser.add_argument('--nb_categories', '-c', type=int, default=8,
                         help='how many categories (3/8)?')
 
-    parser.add_argument('--dilation', type=int, default=1,
-                        help='dilation?')
-
     parser.add_argument('--validation', type=float, default=.2,
                         help='validation set size?')
 
     parser.add_argument("--mode", choices=['NaNGuardMode', 'None'],
                         help='Theano mode to be used.')
-
-    parser.add_argument("--extra_features", default=False,
-                        help='Use PSSM features')
 
     args = parser.parse_args()
 

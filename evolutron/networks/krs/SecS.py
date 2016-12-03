@@ -1,16 +1,24 @@
 from keras.layers import Input, LSTM, Activation, Dropout, Masking, merge
 try:
-    from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
+    from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, \
+        AtrousConvolution1D, Deconvolution1D
+    from .extra_metrics import mean_cat_acc, macro_precision, micro_precision, multiclass_precision, \
+        multiclass_recall, macro_recall, micro_recall, multiclass_fmeasure, macro_fmeasure, micro_fmeasure
+    from .extra_objectives import fmeasure_loss
 except Exception: #ImportError
-    from extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, AtrousConvolution1D
+    from extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, \
+        AtrousConvolution1D, Deconvolution1D
+    from extra_metrics import mean_cat_acc, macro_precision, micro_precision, multiclass_precision, \
+        multiclass_recall, macro_recall, micro_recall, multiclass_fmeasure, macro_fmeasure, micro_fmeasure
+    from extra_objectives import fmeasure_loss
 from keras.models import Model, load_model, model_from_json
-from keras.optimizers import SGD, Nadam
 from keras.regularizers import l2, activity_l1
-from keras.utils.visualize_util import model_to_dot
-from keras.metrics import categorical_accuracy
+from keras.metrics import categorical_accuracy, recall, precision, fmeasure
 from keras.objectives import categorical_crossentropy, mse
-from keras.callbacks import TensorBoard
 import keras.backend as K
+
+import numpy as np
+import argparse, sys, os, h5py
 
 try:
     from evolutron.engine import DeepTrainer
@@ -22,14 +30,12 @@ except ImportError:
     from evolutron.tools import load_dataset, Handle, shape
     from evolutron.networks import custom_layers
 
-import numpy as np
-import argparse, sys, os, h5py
 
-class DeepCoDER(Model):
+class DeepSecS(Model):
     def __init__(self, input, output, name=None):
-        super(DeepCoDER, self).__init__(input, output, name)
+        super(DeepSecS, self).__init__(input, output, name)
 
-        self.metrics = [self.mean_cat_acc, ]
+        self.metrics = [self.mean_cat_acc, self.micro_precision]
 
 
     @classmethod
@@ -57,14 +63,14 @@ class DeepCoDER(Model):
 
     def save(self, filepath, overwrite=True):
         self.__class__.__name__ = 'Model'
-        super(DeepCoDER, self).save(filepath, overwrite=overwrite)
+        super(DeepSecS, self).save(filepath, overwrite=overwrite)
 
     @staticmethod
     def _build_network(input_shape, n_conv_layers, n_fc_layers, n_lstm, nb_filter,
                        filter_length, nb_categories, dilation=1):
         assert len(input_shape) == 2, 'Unrecognizable input dimensions'
         assert K.image_dim_ordering() == 'tf', 'Theano dimension ordering not supported yet'
-        assert input_shape[1] in [20, 4, 22], 'Input dimensions error, check order'
+        assert input_shape[1] in [20, 4, 22, 44], 'Input dimensions error, check order'
 
         seq_length, alphabet = input_shape
 
@@ -171,8 +177,185 @@ class DeepCoDER(Model):
         return K.mean(categorical_crossentropy(K.reshape(y_true, shape=(-1, nb_categories)),
                                                K.reshape(y_pred, shape=(-1, nb_categories))))
 
+    """@staticmethod
+    def _loss_function(y_true, y_pred):
+        return 1 / (fmeasure_loss(y_true, y_pred) + K.epsilon())"""
+
     @staticmethod
     def mean_cat_acc(y_true, y_pred):
+        return mean_cat_acc(y_true, y_pred)
+
+    @staticmethod
+    def multiclass_precision(y_true, y_pred):
+        return multiclass_precision(y_true, y_pred)
+
+    @staticmethod
+    def macro_precision(y_true, y_pred):
+        return macro_precision(y_true, y_pred)
+
+    @staticmethod
+    def micro_precision(y_true, y_pred):
+        return micro_precision(y_true, y_pred)
+
+    @staticmethod
+    def multiclass_recall(y_true, y_pred):
+        return multiclass_recall(y_true, y_pred)
+
+    @staticmethod
+    def macro_recall(y_true, y_pred):
+        return macro_recall(y_true, y_pred)
+
+    @staticmethod
+    def micro_recall(y_true, y_pred):
+        return micro_recall(y_true, y_pred)
+
+    @staticmethod
+    def multiclass_fmeasure(y_true, y_pred):
+        return multiclass_fmeasure(y_true, y_pred)
+
+    @staticmethod
+    def macro_fmeasure(y_true, y_pred):
+        return macro_fmeasure(y_true, y_pred)
+
+    @staticmethod
+    def micro_fmeasure(y_true, y_pred):
+        return micro_fmeasure(y_true, y_pred)
+
+
+class DeepEmbed(Model):
+    def __init__(self, input, output, name=None):
+        super().__init__(input, output, name)
+
+        self.metrics = [self.mean_cat_acc, self.mean_precision, self.mean_recall, self.mean_fmeasure]
+
+
+    @classmethod
+    def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1,
+                     use_lstm=1, nb_categories=8, dilation=1):
+
+        args = cls._build_network(aa_length, n_conv_layers, n_fc_layers, use_lstm, n_filters,
+                                  filter_length, nb_categories)
+
+        args['name'] = cls.__class__.__name__
+
+        """embedding = args.pop('embedding')
+        train_args = args
+        args.pop('output')
+        args['output'] = embedding
+
+        return cls(**train_args), cls(**args)"""
+        return cls(**args)
+
+    @classmethod
+    def from_saved_model(cls, filepath):
+        # First load model architecture
+        hf = h5py.File(filepath)
+        model_config = hf.attrs['model_config'].decode('utf8')
+        hf.close()
+        model = model_from_json(model_config, custom_objects=custom_layers)
+
+        #args['name'] = cls.__class__.__name__
+
+        return cls(model.input, model.output, name='SecSDeepCoDER')
+
+    def save(self, filepath, overwrite=True):
+        self.__class__.__name__ = 'Model'
+        super(DeepEmbed, self).save(filepath, overwrite=overwrite)
+
+    @staticmethod
+    def _build_network(input_shape, n_conv_layers, n_fc_layers, n_lstm, nb_filter,
+                       filter_length, nb_categories, dilation=1):
+        assert len(input_shape) == 2, 'Unrecognizable input dimensions'
+        assert K.image_dim_ordering() == 'tf', 'Theano dimension ordering not supported yet'
+        assert input_shape[1] in [20, 4, 22, 44], 'Input dimensions error, check order'
+
+        seq_length, alphabet = input_shape
+
+        # Input LayerRO
+        inp = Input(shape=input_shape, name='aa_seq')
+
+        mask = Masking(mask_value=0.0)(inp)
+
+        # Convolutional Layers
+        convs = [Convolution1D(nb_filter, filter_length,
+                                 init='glorot_uniform',
+                                 activation='relu',
+                                 border_mode='same',
+                                 name='Conv1')(mask)]
+
+        for c in range(1, n_conv_layers):
+            convs.append(Convolution1D(nb_filter, filter_length,
+                                         init='glorot_uniform',
+                                         activation='relu',
+                                         border_mode='same',
+                                         name='Conv{}'.format(c + 1))(convs[-1]))
+
+        # Max-pooling
+        """
+        if seq_length:
+            max_pool = MaxPooling1D(pool_length=seq_length)(convs[-1])
+            flat = Flatten()(max_pool)
+        else:
+            # max_pool = GlobalMaxPooling1D()(convs[-1])
+            # flat = max_pool
+            raise NotImplementedError('Sequence length must be known at this point. Pad and use mask.')
+        """
+
+        if n_conv_layers:
+            lstm1 = LSTM(output_dim=nb_categories,
+                        return_sequences=True, W_regularizer=None)(convs[-1])
+        else:
+            lstm1 = LSTM(output_dim=nb_categories,
+                         return_sequences=True, W_regularizer=None)(mask)
+
+        # Embedding layer for output
+        # ToDo: make it work for lstm != 1
+        embedding = lstm1
+
+        # reverse lstm
+        un_lstm = LSTM(output_dim=alphabet, go_backwards=True,
+                        return_sequences=True, W_regularizer=None)(embedding)
+
+        # De-convolutions
+        deconvs = [Deconvolution1D(nb_filter=alphabet, filter_length=filter_length,
+                                   init='glorot_uniform',
+                                   activation='relu',
+                                   border_mode='same',
+                                   name='Deconv1')(un_lstm)]
+
+        for c in range(1, n_conv_layers):
+            deconvs.append(Deconvolution1D(nb_filter=alphabet, filter_length=filter_length,
+                                           init='glorot_uniform',
+                                           activation='relu',
+                                           border_mode='same',
+                                           name='Deconv{}'.format(c + 1))(deconvs[-1]))
+        # Softmaxing
+        output = Activation(activation='softmax')(deconvs[-1])
+
+        return {'input': inp, 'output': output}#, 'embedding': embedding}
+
+    @staticmethod
+    def _loss_function(y_true, y_pred):
         nb_categories = K.shape(y_true)[-1]
-        return categorical_accuracy(K.reshape(y_true, shape=(-1, nb_categories)),
-                                    K.reshape(y_pred, shape=(-1, nb_categories)))
+        return K.mean(categorical_crossentropy(K.reshape(y_true, shape=(-1, nb_categories)),
+                                               K.reshape(y_pred, shape=(-1, nb_categories))))
+
+    @staticmethod
+    def mean_cat_acc(y_true, y_pred):
+        return mean_cat_acc(y_true, y_pred)
+
+    @staticmethod
+    def multiclass_precision(y_true, y_pred):
+        return multiclass_precision(y_true, y_pred)
+
+    @staticmethod
+    def macro_precision(y_true, y_pred):
+        return macro_precision(y_true, y_pred)
+
+    @staticmethod
+    def mean_recall(y_true, y_pred):
+        return mean_recall(y_true, y_pred)
+
+    @staticmethod
+    def mean_fmeasure(y_true, y_pred):
+        return mean_fmeasure(y_true, y_pred)
