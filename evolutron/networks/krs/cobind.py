@@ -16,7 +16,7 @@ from keras.layers import GlobalMaxPooling1D
 from keras.layers import Input
 from keras.models import Model, load_model
 
-from .extra_layers import Convolution1D, MaxPooling1D, Dense  # To implement masking
+from evolutron.networks.extra_layers import Convolution1D, MaxPooling1D, Dense  # To implement masking
 
 
 class DeepDNABind(Model):
