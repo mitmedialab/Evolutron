@@ -1,11 +1,8 @@
 # coding=utf-8
 
-from .krs.comet import DeepCoDER, DeepCoFAM
-
 from .krs.cobind import DeepDNABind, DeepDNABindN
 
-from .krs import extra_layers as extra
-
+from . import extra_layers as extra
 custom_layers = {
     'Convolution1D': extra.Convolution1D,
     'Deconvolution1D': extra.Deconvolution1D,
