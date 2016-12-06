@@ -312,14 +312,3 @@ class DeepTrainer:
         np.savez_compressed(filename, **self.history.history)
 
         print('History saved to: ' + filename)
-
-        # def save_kfold_history(self, filename):
-        #     assert (not self.fold_train_losses[0, 0] == .0)
-        #     filename_ = filename + '.k_fold'
-        #     np.savez_compressed(filename_,
-        #                         fold_train_losses=self.fold_train_losses,
-        #                         fold_val_losses=self.fold_val_losses,
-        #                         val_pred=self.k_fold_history['val_preds'],
-        #                         train_pred=self.k_fold_history['train_preds'],
-        #                         val_class=self.k_fold_history['val_classes'],
-        #                         train_class=self.k_fold_history['train_classes'])
