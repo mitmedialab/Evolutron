@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-    SecS - Secondary Structure
+    SecS - Secondary DeepSecS
     ------------------------------------------_
     SecStructure is an automated tool for prediction of protein secondary structure
      from it's amino acid sequence.
@@ -19,17 +19,17 @@ import numpy as np
 
 # Check if package is installed, else fallback to developer mode imports
 try:
-    import Structure.SecS as SecS
+    import DeepSecS.SecS as SecS
 except ImportError:
     import os
     import sys
 
     sys.path.insert(0, os.path.abspath('..'))
-    import Structure.SecS as SecS
+    import DeepSecS.SecS as SecS
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='SecS - Secondary Structure Prediction Tool',
+    parser = argparse.ArgumentParser(description='SecS - Secondary DeepSecS Prediction Tool',
                                      argument_default=argparse.SUPPRESS)
 
     parser.add_argument("data_id", default='cullPDB',
@@ -83,37 +83,52 @@ if __name__ == '__main__':
     parser.add_argument("--mode", choices=['NaNGuardMode'],
                         help='Theano mode to be used.')
 
+    parser.add_argument("--extra_features", action='store_true',
+                        help='Use PSSM features')
+
+    parser.add_argument("--embeddings", type=str,
+                        help='List of embeddings to use.')
+
+    parser.add_argument('--nb_aa', type=int, default=22,
+                        help='how many aa in the alphabet?')
+
     args = parser.parse_args()
 
     kwargs = args.__dict__
 
     count = 0
 
-    for dilation in [1, 3, 5, 10]:
-        for clipnorm in [1, .5, .1]:
+    if not ('extra_features' in kwargs):
+        kwargs['extra_features'] = False
+    if not ('embeddings' in kwargs):
+        kwargs['embeddings'] = False
+
+    for clipnorm in [0, 1, .5]:
+        for dilation in [1, 3, 5, 10]:
+        #for dilation in [10, 5, 3, 1]:
             #for conv in [5, 3, 9, 7, 1]:
                 for filter_length in [30, 15, 9, 5, 50]:
-                    for rate in [10 ** i for i in range(-2, 1, 1)]:
-                        kwargs['rate'] = rate
-                        #kwargs['conv'] = conv
-                        kwargs['filter_length'] = filter_length
-                        kwargs['dilation'] = dilation
-                        kwargs['clipnorm'] = clipnorm
+                    for rate in [.01, .001, .1, .0001]:
+                        if not kwargs['lstm'] or rate >= .001:
+                            kwargs['rate'] = rate
+                            kwargs['filter_length'] = filter_length
+                            kwargs['dilation'] = dilation
+                            kwargs['clipnorm'] = clipnorm
 
-                        # sys.stdout = file
-                        score, cb513_score, casp10_score, casp11_score, handle = SecS.main(**kwargs)
-                        # sys.stdout = sys.__stdout__
+                            # sys.stdout = file
+                            score, cb513_score, casp10_score, casp11_score, handle = SecS.main(**kwargs)
+                            # sys.stdout = sys.__stdout__
 
-                        with open('HyperParameterOpt.txt', mode='a') as file:
-                            file.write('%d,%d,%d,%d,%.2f,%.2f\n'
-                                       '%.3f, %.3f\n%.3f, %.3f\n'
-                                       '%.3f, %.3f\n%.3f, %.3f\n' %
-                                       (kwargs['lstm'], kwargs['conv'], filter_length, dilation, rate, clipnorm,
-                                        score[0], 100 * score[1], cb513_score[0], 100 * cb513_score[1],
-                                        casp10_score[0], 100 * casp10_score[1], casp11_score[0], 100 * casp11_score[1]))
+                            with open('HyperParameterOpt.txt', mode='a') as file:
+                                file.write('%d,%d,%d,%d,%.2f,%.1f,' %
+                                           (kwargs['lstm'], kwargs['conv'], filter_length, dilation, rate, clipnorm)
+                                           + kwargs['optimizer'] + ', ' +
+                                           str(kwargs['extra_features']) + ', ' +
+                                           str(kwargs['embeddings']) + ', ' +
+                                           '%.3f, %.3f, %.3f, %.3f, '
+                                           '%.3f, %.3f, %.3f, %.3f\n' %
+                                           (score[0], 100 * score[1], cb513_score[0], 100 * cb513_score[1],
+                                            casp10_score[0], 100 * casp10_score[1], casp11_score[0], 100 * casp11_score[1]))
 
-
-
-
-                            count += 1
-                            print('Finished %d iterations' % count)
+                                count += 1
+                                print('Finished %d iterations' % count)

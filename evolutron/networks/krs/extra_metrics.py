@@ -7,8 +7,15 @@ Beta = 1
 
 def mean_cat_acc(y_true, y_pred):
     nb_categories = K.shape(y_true)[-1]
-    return categorical_accuracy(K.reshape(y_true, shape=(-1, nb_categories)),
-                                K.reshape(y_pred, shape=(-1, nb_categories)))
+    y_true = K.reshape(y_true, shape=(-1, nb_categories))
+    y_pred = K.reshape(y_pred, shape=(-1, nb_categories))
+
+    real_len = K.sum(y_true)
+    is_real = K.sum(y_true, -1)
+    #y_true = K.concatenate([y_true, K.epsilon() * K.max(K.ones_like(y_true), -1, keepdims=True)])
+    s = K.sum(K.equal(K.argmax(y_true, axis=-1),
+                  K.argmax(y_pred, axis=-1)) * is_real)
+    return s/real_len
 
 
 def multiclass_precision(y_true, y_pred):

@@ -168,7 +168,10 @@ def fasta_parser(filename, codes=False):
     for record in SeqIO.parse(input_file, "fasta"):
         aa_list.append(str(record.seq))
         if codes:
-            code_list.append(type2p_code(record.description))  # TODO: make this work with other codes too
+            if filename == 'datasets/scop2.fasta':
+                code_list.append(record.description.split('|')[-1])
+            else:
+                code_list.append(type2p_code(record.description))  # TODO: make this work with other codes too
 
     x_data = list(map(aa2hot, aa_list))
 
@@ -180,7 +183,8 @@ def fasta_parser(filename, codes=False):
     return x_data, y_data
 
 
-def tab_parser(filename, codes=False, key='fam'):
+def tab_parser(filename, codes=False, key='fam', nb_aa=20):
+
     try:
         raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
     except FileNotFoundError:
@@ -192,7 +196,7 @@ def tab_parser(filename, codes=False, key='fam'):
 
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
 
-    x_data = raw_data.sequence.apply(aa2hot).tolist()
+    x_data = raw_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
 
     if codes:
         pf = raw_data[key].astype('category')
@@ -200,14 +204,14 @@ def tab_parser(filename, codes=False, key='fam'):
         pos_data = raw_data[raw_data['codes'] > 0]
         y_data = pos_data.codes.tolist()
         y_data = [y + 1 for y in y_data]
-        x_data = pos_data.sequence.apply(aa2hot).tolist()
+        x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
     else:
         y_data = None
 
     return x_data, y_data
 
 
-def SecS_parser(filename, nb_categories=8, dummy_option=None):
+def SecS_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
     """
         This module parses data from files containing sequence and secondary structure
         and transforms them to Evolutron format.
@@ -230,7 +234,7 @@ def SecS_parser(filename, nb_categories=8, dummy_option=None):
 
             flag = True
 
-    x_data = list(map(lambda x: aa2hot(x, 22), aa_list))
+    x_data = list(map(lambda x: aa2hot(x, nb_aa), aa_list))
     if nb_categories == 8:
         y_data = list(map(SecS2hot_8cat, SecS_list))
     elif nb_categories == 3:
@@ -241,7 +245,7 @@ def SecS_parser(filename, nb_categories=8, dummy_option=None):
     return x_data, y_data
 
 
-def npz_parser(filename, nb_categories=8, extra_features=False, dummy_option=None):
+def npz_parser(filename, nb_categories=8, extra_features=False, nb_aa=22, dummy_option=None):
     """
         This module parses data from npz files containing sequence and secondary structure
         and transforms them to Evolutron format.
@@ -252,10 +256,10 @@ def npz_parser(filename, nb_categories=8, extra_features=False, dummy_option=Non
     data = np.reshape(data[:], (-1, 700, 57))
 
     if extra_features:
-        idx = np.hstack((np.arange(0, 22), np.arange(35, 57)))
+        idx = np.hstack((np.arange(0, nb_aa), np.arange(35, 35+nb_aa)))
         x_data = data[:, :, idx]
     else:
-        x_data = data[:, :, :22]
+        x_data = data[:, :, :nb_aa]
     y_data = data[:, :, 22:30]
 
     return x_data, y_data

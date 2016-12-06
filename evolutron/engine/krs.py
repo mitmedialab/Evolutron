@@ -110,7 +110,7 @@ class DeepTrainer:
             raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
 
     def fit(self, x_data, y_data, nb_epoch=1, batch_size=64, shuffle=True, validate=.0, patience=10,
-            return_best_model=True, verbose=1, extra_callbacks=None):
+            return_best_model=True, verbose=1, extra_callbacks=None, reduce_factor=.5):
 
         # Check arguments
         if extra_callbacks is None:
@@ -145,7 +145,7 @@ class DeepTrainer:
 
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
                                       patience=patience - 5, min_lr=0.001, verbose=1)
         rn = np.random.random()
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',

@@ -22,7 +22,9 @@ file_db = {
     'cb513': 'cb513+profile_split1.npy.gz',
     'human_ors': 'uniprot_human_ors.tsv',
     'casp10': 'casp10.sec',
-    'casp11': 'casp11.sec'
+    'casp11': 'casp11.sec',
+    'hsapx': 'sprot_hsapiens_expr_pfam.tsv',
+    'scop': 'scop2.fasta',
 }
 
 
@@ -43,7 +45,7 @@ def pad_or_clip_seq(x, n):
         return x[:n, :]
 
 
-def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False, **parser_options):
+def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=False, **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
     try:
@@ -53,7 +55,7 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False
         raise IOError('Dataset id not in file database.')
 
     if filetype == 'tsv':
-        x_data, y_data = io.tab_parser('datasets/' + filename, **parser_options)
+        x_data, y_data = io.tab_parser('datasets/' + filename, i_am_kfir=i_am_kfir, **parser_options)
     elif filetype == 'fasta':
         x_data, y_data = io.fasta_parser('datasets/' + filename, **parser_options)
     elif filetype == 'sec':
@@ -67,24 +69,26 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False
         if not max_aa:
             max_aa = int(np.percentile([len(x) for x in x_data], 99))  # pad so that 99% of datapoints are complete
         else:
-            # ToDo: I changed the min to max (seems to make sense), check if that's good for you!
-            if i_am_kfir:
-                max_aa = max(max_aa, np.max([len(x) for x in x_data]))
-            else:
-                max_aa = min(max_aa, np.max([len(x) for x in x_data]))
+            max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
         x_data = np.asarray([pad_or_clip_seq(x, max_aa) for x in x_data])
 
-        if i_am_kfir:
+        if min_aa:
+            min_aa = max(min_aa, np.max([len(x) for x in x_data]))
+            x_data = np.asarray([pad_or_clip_seq(x, min_aa) for x in x_data])
+
+        if pad_y_data:
             try:
-                y_data = np.asarray([pad_or_clip_seq(y, max_aa) for y in y_data])
+                y_data = np.asarray([pad_or_clip_seq(y, min_aa) for y in y_data])
                 return x_data, y_data
             except:
                 pass
 
     data_size = len(x_data)
 
-    if not y_data:
+    # ToDo: The old format returns an error when y_data is an array. CHECK!
+    #if not y_data:
+    if y_data is None:
         # Unsupervised Learning
         # x_data: observations
 
