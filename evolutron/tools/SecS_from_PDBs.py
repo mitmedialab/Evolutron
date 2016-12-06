@@ -27,6 +27,5 @@ for pdb in pdb_files:
         file.write('>{}\n'.format(pdb))
         file.write('{}\n'.format(ss))
 
-
 file.close()
 

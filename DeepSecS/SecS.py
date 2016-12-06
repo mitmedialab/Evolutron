@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-    SecS - Secondary Structure
+    SecS - Secondary DeepSecS
     ------------------------------------------_
     SecStructure is an automated tool for prediction of protein secondary structure
      from it's amino acid sequence.
@@ -16,11 +16,17 @@ import argparse
 import time
 
 import numpy as np
+from keras.callbacks import ReduceLROnPlateau
+try:
+    from .Embedder import main as Embedder
+except SystemError:
+    from Embedder import main as Embedder
 
 # Check if package is installed, else fallback to developer mode imports
 try:
     import evolutron.networks as nets
     from evolutron.tools import load_dataset, none2str, Handle
+    from evolutron.tools.seq_tools import hot2aa, hot2SecS_8cat
     from evolutron.engine import DeepTrainer
     from evolutron.networks.krs.SecS import DeepSecS
 except ImportError:
@@ -30,13 +36,14 @@ except ImportError:
     sys.path.insert(0, os.path.abspath('..'))
     import evolutron.networks as nets
     from evolutron.tools import load_dataset, none2str, Handle, shape
+    from evolutron.tools.seq_tools import hot2aa, hot2SecS_8cat
     from evolutron.engine import DeepTrainer
     from evolutron.networks.krs.SecS import DeepSecS
 
 
 def supervised(x_data, y_data, handle,
                epochs=10,
-               batch_size=128,
+               batch_size=64,
                filters=8,
                filter_length=10,
                validation=.3,
@@ -49,9 +56,9 @@ def supervised(x_data, y_data, handle,
                dilation=1,
                model=None,
                mode=None,
-               clipnorm=0):
-
-    filters = nb_categories
+               clipnorm=0,
+               embeddings=None,
+               **dataset_options):
 
     # Find input shape
     if type(x_data) == np.ndarray:
@@ -74,7 +81,7 @@ def supervised(x_data, y_data, handle,
                                          filter_length=filter_length,
                                          nb_categories=nb_categories,
                                          dilation=dilation)
-        handle.model = 'realDeepCoDER'
+        handle.model = 'DeepSecS'
 
     conv_net = DeepTrainer(net_arch)
     conv_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
@@ -83,31 +90,64 @@ def supervised(x_data, y_data, handle,
 
     print('Started training at {}'.format(time.asctime()))
 
+    rl = ReduceLROnPlateau(factor=.2, patience=20)
+
     conv_net.fit(x_data, y_data,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
                  patience=50,
-                 )
+                 extra_callbacks=[rl])
 
     print('Testing model ...')
     score = conv_net.score(x_data, y_data)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
+    prediction = conv_net.predict(x_data)
+    with open('tmp/cullPDB_%.2f.txt' % score[0], 'w') as f:
+        for i in range(x_data.shape[0]):
+            f.write(hot2aa(x_data[i,:,:22]))
+            f.write('\n')
+            f.write(hot2SecS_8cat(y_data[i,:,:]))
+            f.write('\n')
+            f.write(hot2SecS_8cat(prediction[i, :, :]))
+            f.write('\n')
+            f.write('\n')
+
     print('Testing model with CB513...')
-    x_data, y_data = load_dataset(data_id='cb513', i_am_kfir=True)
+    dataset_options['pad_y_data'] = True
+    x_data, y_data = load_dataset(data_id='cb513', **dataset_options)
+    x_data = augment(x_data, embeddings, data_id='cb513', **dataset_options)
     cb513_score = conv_net.score(x_data, y_data)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(cb513_score[0], 100 * cb513_score[1]))
 
-    print('Testing model with CASP10...')
-    x_data, y_data = load_dataset(data_id='casp10', i_am_kfir=True, padded=True, max_aa=700)
-    casp10_score = conv_net.score(x_data, y_data)
-    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp10_score[0], 100 * casp10_score[1]))
+    if dataset_options['extra_features'] is None:
+        print('Testing model with CASP10...')
+        dataset_options.pop('extra_features')
+        x_data, y_data = load_dataset(data_id='casp10', **dataset_options, min_aa=700, max_aa=700)
+        x_data = augment(x_data, embeddings, data_id='casp10', **dataset_options)
+        casp10_score = conv_net.score(x_data, y_data)
+        print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp10_score[0], 100 * casp10_score[1]))
 
-    print('Testing model with CASP11...')
-    x_data, y_data = load_dataset(data_id='casp11', i_am_kfir=True, max_aa=700)
-    casp11_score = conv_net.score(x_data, y_data)
-    print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp11_score[0], 100 * casp11_score[1]))
+        prediction = conv_net.predict(x_data)
+        with open('tmp/casp10_%.2f.txt' % score[0], 'w') as f:
+            for i in range(x_data.shape[0]):
+                f.write(hot2aa(x_data[i, :, :]))
+                f.write('\n')
+                f.write(hot2SecS_8cat(y_data[i, :, :]))
+                f.write('\n')
+                f.write(hot2SecS_8cat(prediction[i, :, :]))
+                f.write('\n')
+                f.write('\n')
+
+        print('Testing model with CASP11...')
+        x_data, y_data = load_dataset(data_id='casp11', **dataset_options, min_aa=700, max_aa=700)
+        x_data = augment(x_data, embeddings, data_id='casp11', **dataset_options)
+        casp11_score = conv_net.score(x_data, y_data)
+        print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp11_score[0], 100 * casp11_score[1]))
+    else:
+        casp10_score = (0, 0)
+        casp11_score = (0, 0)
 
     conv_net.save_train_history(handle)
     conv_net.save_model_to_file(handle)
@@ -119,23 +159,44 @@ def get_args(kwargs, args):
     return {k: kwargs.pop(k) for k in args if k in kwargs}
 
 
+def augment(x_data, embeddings, **dataset_options):
+    if embeddings:
+        if embeddings.find('CoMET'):
+            dataset_options['nb_aa'] = 20
+
+        if embeddings[0] == '[':
+            embeddings = embeddings[1:-1].split(',')
+        else:
+            embeddings = [embeddings]
+
+        for embed_model in embeddings:
+            embed = Embedder(**dataset_options, mode='embed',
+                             model=embed_model)
+            x_data = np.concatenate((x_data, embed), axis=-1)
+
+    return x_data
+
+
 def main(**options):
     if 'model' in options:
         handle = Handle.from_filename(options.get('model'))
         #assert handle.program == 'SecS', 'The model file provided is for another program.'
     else:
-        options['filters'] = time.time()
+        t = time.gmtime()
+        """options['filters'] = str(t[0]) + str(t[1]).zfill(2) + str(t[2]).zfill(2) \
+                             + str(t[3]).zfill(2) + str(t[4]).zfill(2)"""
         handle = Handle(**options)
 
     # Load the dataset
     print("Loading data...")
-    dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories', 'extra_features'])
-    dataset = load_dataset(**dataset_options, i_am_kfir=True)
+    dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories', 'extra_features', 'nb_aa'])
+    x_data, y_data = load_dataset(**dataset_options, pad_y_data=True)
 
-    options['nb_categories'] = dataset_options['nb_categories']
-    return supervised(dataset[0], dataset[1], handle, **options)
+    if 'embeddings' in options:
+        x_data = augment(x_data, options['embeddings'], **dataset_options)
 
-
+    dataset_options.pop('data_id')
+    return supervised(x_data, y_data, handle, **options, **dataset_options)
 
 
 if __name__ == '__main__':
@@ -166,7 +227,7 @@ if __name__ == '__main__':
     parser.add_argument("-e", "--epochs", default=50, type=int,
                         help='number of training epochs to perform (default: 50)')
 
-    parser.add_argument("-b", "--batch_size", type=int, default=256,
+    parser.add_argument("-b", "--batch_size", type=int, default=64,
                         help='Size of minibatch.')
 
     parser.add_argument("--rate", type=float,
@@ -193,8 +254,14 @@ if __name__ == '__main__':
     parser.add_argument("--mode", choices=['NaNGuardMode', 'None'],
                         help='Theano mode to be used.')
 
-    parser.add_argument("--extra_features", default=False,
+    parser.add_argument("--extra_features", action='store_true',
                         help='Use PSSM features')
+
+    parser.add_argument("--embeddings", type=str,
+                        help='List of embeddings to use.')
+
+    parser.add_argument('--nb_aa', type=int, default=22,
+                        help='how many aa in the alphabet?')
 
     args = parser.parse_args()
 
@@ -204,6 +271,8 @@ if __name__ == '__main__':
         kwargs['batch_size'] = 1
         kwargs.pop('no_pad')
         kwargs['padded'] = False
+    else:
+        kwargs['padded'] = True
 
     if hasattr(args, 'model'):
         try:
