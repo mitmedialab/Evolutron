@@ -180,7 +180,7 @@ def fasta_parser(filename, codes=False):
     return x_data, y_data
 
 
-def tab_parser(filename, codes=False, key='fam', shuffle=True):
+def tab_parser(filename, codes=False, key='fam'):
     try:
         raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
     except FileNotFoundError:
@@ -191,9 +191,6 @@ def tab_parser(filename, codes=False, key='fam', shuffle=True):
         raw_data['sub'] = raw_data['protein_families'].apply(subfam)
 
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
-
-    if shuffle:
-        raw_data = raw_data.sample(frac=1).reset_index(drop=True)
 
     x_data = raw_data.sequence.apply(aa2hot).tolist()
 
