@@ -55,7 +55,7 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
         raise IOError('Dataset id not in file database.')
 
     if filetype == 'tsv':
-        x_data, y_data = io.tab_parser('datasets/' + filename, i_am_kfir=i_am_kfir, **parser_options)
+        x_data, y_data = io.tab_parser('datasets/' + filename, **parser_options)
     elif filetype == 'fasta':
         x_data, y_data = io.fasta_parser('datasets/' + filename, **parser_options)
     elif filetype == 'sec':
