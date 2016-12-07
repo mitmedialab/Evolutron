@@ -36,7 +36,7 @@ def data_it(dataset, block_size):
         yield dataset[excerpt]
 
 
-def pad_or_clip(x, n):
+def pad_or_clip_seq(x, n):
     if n >= x.shape[0]:
         return np.concatenate((x[:n, :], np.zeros((n - x.shape[0], x.shape[1]))))
     else:
@@ -73,11 +73,11 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, i_am_kfir=False
             else:
                 max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
-        x_data = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
+        x_data = np.asarray([pad_or_clip_seq(x, max_aa) for x in x_data])
 
         if i_am_kfir:
             try:
-                y_data = np.asarray([pad_or_clip(y, max_aa) for y in y_data])
+                y_data = np.asarray([pad_or_clip_seq(y, max_aa) for y in y_data])
                 return x_data, y_data
             except:
                 pass
