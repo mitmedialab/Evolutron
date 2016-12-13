@@ -25,7 +25,8 @@ file_db = {
     'casp11': 'casp11.sec',
     'hsapx': 'sprot_hsapiens_expr_pfam.tsv',
     'scop': 'scop2.fasta',
-    'swissprot': 'sprot_all_pfam.tsv'
+    'swissprot': 'sprot_all_pfam.tsv',
+    'acetyl': 'sprot_ec2_3_pfam.tsv'
 }
 
 
