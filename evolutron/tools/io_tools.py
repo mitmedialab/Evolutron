@@ -256,7 +256,7 @@ def npz_parser(filename, nb_categories=8, extra_features=False, nb_aa=22, dummy_
     data = np.reshape(data[:], (-1, 700, 57))
 
     if extra_features:
-        idx = np.hstack((np.arange(0, nb_aa), np.arange(35, 35+nb_aa)))
+        idx = np.hstack((np.arange(0, nb_aa), np.arange(31,33), np.arange(35, 35+nb_aa)))
         x_data = data[:, :, idx]
     else:
         x_data = data[:, :, :nb_aa]

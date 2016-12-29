@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-    SecS - Secondary DeepSecS
+    DeepSecS - Deep Secondary Structure
     ------------------------------------------_
-    SecStructure is an automated tool for prediction of protein secondary structure
+    DeepSecS is an automated tool for prediction of protein secondary structure
      from it's amino acid sequence.
 
     (c) Massachusetts Institute of Technology
@@ -90,14 +90,15 @@ def supervised(x_data, y_data, handle,
 
     print('Started training at {}'.format(time.asctime()))
 
-    rl = ReduceLROnPlateau(factor=.2, patience=20)
+    rl = ReduceLROnPlateau(factor=.2, patience=10)
 
     conv_net.fit(x_data, y_data,
                  nb_epoch=epochs,
                  batch_size=batch_size,
                  validate=validation,
                  patience=50,
-                 extra_callbacks=[rl])
+                 extra_callbacks=[],
+                 reduce_factor=.2)
 
     print('Testing model ...')
     score = conv_net.score(x_data, y_data)
