@@ -146,7 +146,7 @@ class DeepTrainer:
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
         reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
-                                      patience=patience - 5, min_lr=0.001, verbose=1)
+                                      patience=patience / 2, min_lr=0.001, verbose=1)
         rn = np.random.random()
         checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
                                      save_best_only=True, save_weights_only=True)
