@@ -207,10 +207,10 @@ if __name__ == '__main__':
     parser.add_argument("data_id",
                         help='The protein dataset to be trained on.')
 
-    parser.add_argument("--filters", type=int,
+    parser.add_argument("--filters",
                         help='Number of filters in the convolutional layers.')
 
-    parser.add_argument("--filter_length", type=int,
+    parser.add_argument("--filter_length",
                         help='Size of filters in the first convolutional layer.')
 
     parser.add_argument("--no_pad", action='store_true',

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot, SecS2hot_8cat, SecS2hot_3cat
+from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot, SecS2hot_8cat, SecS2hot_3cat, aa2codon, hot2aa
 
 
 ############################
@@ -257,7 +257,10 @@ def npz_parser(filename, nb_categories=8, extra_features=False, nb_aa=22, dummy_
 
     if extra_features:
         idx = np.hstack((np.arange(0, nb_aa), np.arange(31,33), np.arange(35, 35+nb_aa)))
-        x_data = data[:, :, idx]
+        codons = []
+        for i in range(data.shape[0]):
+            codons.append(aa2codon(hot2aa(data[i, :, 0:22])))
+        x_data = np.concatenate((data[:, :, idx], codons), axis=-1)
     else:
         x_data = data[:, :, :nb_aa]
     y_data = data[:, :, 22:30]
