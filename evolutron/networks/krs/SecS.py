@@ -17,6 +17,8 @@ import keras.backend as K
 
 import numpy as np
 import argparse, sys, os, h5py
+from ast import literal_eval
+
 
 try:
     from evolutron.engine import DeepTrainer
@@ -75,13 +77,23 @@ class DeepSecS(Model):
         if n_conv_layers == 1:
             nb_filters = nb_categories
 
+        if type(nb_filters) == int:
+            nb_filters *= np.ones(n_conv_layers)
+        else:
+            nb_filters = literal_eval(nb_filters)
+
+        if type(filter_length) == int:
+            filter_length *= np.ones(n_conv_layers)
+        else:
+            filter_length = literal_eval(filter_length)
+
         # Input LayerRO
         inp = Input(shape=input_shape, name='aa_seq')
 
         mask = Masking(mask_value=0.0)(inp)
 
         # Convolutional Layers
-        convs = [AtrousConvolution1D(nb_filters, filter_length,
+        convs = [AtrousConvolution1D(nb_filters[0], filter_length[0],
                                      atrous_rate=1,
                                      init='glorot_uniform',
                                      activation='relu',
@@ -89,7 +101,7 @@ class DeepSecS(Model):
                                      name='Conv1')(mask)]
 
         for c in range(1, n_conv_layers-1):
-            convs.append(AtrousConvolution1D(nb_filters, filter_length,
+            convs.append(AtrousConvolution1D(nb_filters[c], filter_length[c],
                                              atrous_rate=dilation**c,
                                              init='glorot_uniform',
                                              activation='relu',
@@ -97,7 +109,7 @@ class DeepSecS(Model):
                                              name='Conv{}'.format(c + 1))(convs[-1]))
 
         if n_conv_layers > 1:
-            convs.append(AtrousConvolution1D(nb_categories, filter_length,
+            convs.append(AtrousConvolution1D(nb_categories, filter_length[n_conv_layers-1],
                                              atrous_rate=dilation**(n_conv_layers-1),
                                              init='glorot_uniform',
                                              activation='relu',

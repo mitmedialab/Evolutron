@@ -118,6 +118,33 @@ nt_map = {
     'N': [0.25, 0.25, 0.25, 0.25],
 }
 
+aa2cod_map = {
+    'M': [11],
+    'L': range(2, 8),
+    'G': range(60, 64),
+    'P': range(20, 24),
+    'A': range(28, 32),
+    'V': range(12, 16),
+    'I': range(8, 11),
+    'C': range(48, 50),
+    'F': [0, 1],
+    'Y': range(32, 34),
+    'W': [51],
+    'H': range(36, 38),
+    'K': range(42, 44),
+    'R': [52, 53, 54, 55, 58, 59],
+    'Q': range(38, 40),
+    'N': range(40, 42),
+    'E': range(46, 48),
+    'D': range(44, 46),
+    'S': [16, 17, 18, 19, 56, 57],
+    'T': range(24, 28),
+    'U': [50],
+    'O': [50],
+}
+
+
+
 """
 Transformations between representations
 """
@@ -222,3 +249,11 @@ def prob2nt(prob):
     f = np.vectorize(ntround)
 
     return f(prob)
+
+
+def aa2codon(aa_seq):
+    cod = np.zeros((len(aa_seq), 64))
+    for i in range(len(aa_seq)):
+        cod[i, aa2cod_map[aa_seq[i]]] = 1
+
+    return cod
