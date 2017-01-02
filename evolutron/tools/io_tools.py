@@ -245,7 +245,8 @@ def SecS_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
     return x_data, y_data
 
 
-def npz_parser(filename, nb_categories=8, extra_features=False, nb_aa=22, dummy_option=None):
+def npz_parser(filename, nb_categories=8, pssm=False, codon_table=False,
+               extra_features=False, nb_aa=22, dummy_option=None):
     """
         This module parses data from npz files containing sequence and secondary structure
         and transforms them to Evolutron format.
@@ -255,14 +256,18 @@ def npz_parser(filename, nb_categories=8, extra_features=False, nb_aa=22, dummy_
 
     data = np.reshape(data[:], (-1, 700, 57))
 
+    x_data = data[:, :, :nb_aa]
+
+    if pssm:
+        x_data = np.concatenate((x_data, data[:, :, 35:35+nb_aa]), axis=-1)
     if extra_features:
-        idx = np.hstack((np.arange(0, nb_aa), np.arange(31,33), np.arange(35, 35+nb_aa)))
+        x_data = np.concatenate((x_data, data[:, :, 31:33]), axis=-1)
+    if codon_table:
         codons = []
         for i in range(data.shape[0]):
             codons.append(aa2codon(hot2aa(data[i, :, 0:22])))
-        x_data = np.concatenate((data[:, :, idx], codons), axis=-1)
-    else:
-        x_data = data[:, :, :nb_aa]
+        x_data = np.concatenate((x_data, codons), axis=-1)
+
     y_data = data[:, :, 22:30]
 
     return x_data, y_data

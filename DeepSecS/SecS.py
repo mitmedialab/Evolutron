@@ -42,10 +42,11 @@ except ImportError:
 
 
 def supervised(x_data, y_data, handle,
-               epochs=10,
+               epochs=50,
                batch_size=64,
-               filters=8,
+               filters=100,
                filter_length=10,
+               units=500,
                validation=.3,
                optimizer='nadam',
                rate=.01,
@@ -54,6 +55,10 @@ def supervised(x_data, y_data, handle,
                lstm=1,
                nb_categories=8,
                dilation=1,
+               p=.4,
+               nb_lc_units=96,
+               lc_filter_length=11,
+               l=.1503,
                model=None,
                mode=None,
                clipnorm=0,
@@ -80,13 +85,18 @@ def supervised(x_data, y_data, handle,
                                          n_filters=filters,
                                          filter_length=filter_length,
                                          nb_categories=nb_categories,
-                                         dilation=dilation)
+                                         dilation=dilation,
+                                         nb_units=units,
+                                         p=p,
+                                         nb_lc_units=nb_lc_units,
+                                         lc_filter_length=lc_filter_length,
+                                         l=l)
         handle.model = 'DeepSecS'
 
+    print('Compiling model ...')
     conv_net = DeepTrainer(net_arch)
-    conv_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
-
     conv_net.display_network_info()
+    conv_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
 
     print('Started training at {}'.format(time.asctime()))
 
@@ -190,7 +200,8 @@ def main(**options):
 
     # Load the dataset
     print("Loading data...")
-    dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories', 'extra_features', 'nb_aa'])
+    dataset_options = get_args(options, ['data_id', 'padded', 'nb_categories', 'pssm', 'codon_table',
+                                         'extra_features', 'nb_aa'])
     x_data, y_data = load_dataset(**dataset_options, pad_y_data=True)
 
     if 'embeddings' in options:
@@ -255,6 +266,12 @@ if __name__ == '__main__':
     parser.add_argument("--mode", choices=['NaNGuardMode', 'None'],
                         help='Theano mode to be used.')
 
+    parser.add_argument("--pssm", action='store_true',
+                        help='Use PSSM features')
+
+    parser.add_argument("--codon_table", action='store_true',
+                        help='Use PSSM features')
+
     parser.add_argument("--extra_features", action='store_true',
                         help='Use PSSM features')
 
@@ -263,6 +280,21 @@ if __name__ == '__main__':
 
     parser.add_argument('--nb_aa', type=int, default=22,
                         help='how many aa in the alphabet?')
+
+    parser.add_argument('--units', type=int, default=500,
+                        help='number of units in the inner network')
+
+    parser.add_argument('--p', type=float, default=.4,
+                        help='Dropout probability')
+
+    parser.add_argument('--l', type=float, default=.1503,
+                        help='l2 regulizer coefficient')
+
+    parser.add_argument('--nb_lc_units', type=int, default=96,
+                        help='number of locally connected filters')
+
+    parser.add_argument('--lc_filter_length', type=int, default=11,
+                        help='filter length for the locally connected layers')
 
     args = parser.parse_args()
 
