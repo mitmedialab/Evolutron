@@ -33,8 +33,12 @@ class DeepTrainer:
         self.verbose = verbose
 
         self.network = network
-        self.input = network.input
-        self.output = network.output
+        try:
+            self.input = network.input
+            self.output = network.output
+        except AttributeError:
+            self.input = network.inputs
+            self.output = network.outputs
 
         self.classification = classification
 
@@ -178,6 +182,8 @@ class DeepTrainer:
         print(
             'Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
                                                                         time.time() - start_time))
+
+        return x_valid, y_valid
 
     def k_fold(self, x_data, y_data, epochs=1, num_folds=10, stratify=False):
         raise NotImplementedError
