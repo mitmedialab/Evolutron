@@ -17,6 +17,7 @@ import time
 
 import numpy as np
 from keras.callbacks import ReduceLROnPlateau
+from sklearn.model_selection import train_test_split
 try:
     from .Embedder import main as Embedder
 except SystemError:
@@ -28,7 +29,7 @@ try:
     from evolutron.tools import load_dataset, none2str, Handle
     from evolutron.tools.seq_tools import hot2aa, hot2SecS_8cat
     from evolutron.engine import DeepTrainer
-    from evolutron.networks.krs.SecS import DeepSecS
+    from evolutron.networks.krs.GAN_SecS import DeepSecS_Gen_Dis
 except ImportError:
     import os
     import sys
@@ -38,7 +39,7 @@ except ImportError:
     from evolutron.tools import load_dataset, none2str, Handle, shape
     from evolutron.tools.seq_tools import hot2aa, hot2SecS_8cat
     from evolutron.engine import DeepTrainer
-    from evolutron.networks.krs.SecS import DeepSecS
+    from evolutron.networks.krs.GAN_SecS import DeepSecS_Gen_Dis
 
 
 def supervised(x_data, y_data, handle,
@@ -68,41 +69,122 @@ def supervised(x_data, y_data, handle,
     # Find input shape
     if type(x_data) == np.ndarray:
         input_shape = x_data[0].shape
+        nb_train_sample = x_data.shape[0]
     elif type(x_data) == list:
         input_shape = (None, x_data[0].shape[1])
+        nb_train_sample = len(x_data)
     else:
         raise TypeError('Something went wrong with the dataset type')
 
     if model:
-        net_arch = DeepSecS.from_saved_model(model)
+        net_arch = DeepSecS_Gen_Dis.from_saved_model(model)
         print('Loaded model')
     else:
         print('Building model ...')
-        net_arch = DeepSecS.from_options(input_shape,
-                                         n_conv_layers=conv,
-                                         n_fc_layers=fc,
-                                         use_lstm=lstm,
-                                         n_filters=filters,
-                                         filter_length=filter_length,
-                                         nb_categories=nb_categories,
-                                         dilation=dilation,
-                                         nb_units=units,
-                                         p=p,
-                                         nb_lc_units=nb_lc_units,
-                                         lc_filter_length=lc_filter_length,
-                                         l=l)
+        generator_arc, discriminator_arc, gen_dis_arc = DeepSecS_Gen_Dis.from_options(input_shape,
+                                                                                     n_conv_layers=conv,
+                                                                                     n_fc_layers=fc,
+                                                                                     use_lstm=lstm,
+                                                                                     n_filters=filters,
+                                                                                     filter_length=filter_length,
+                                                                                     nb_categories=nb_categories,
+                                                                                     dilation=dilation,
+                                                                                     nb_units=units,
+                                                                                     p=p,
+                                                                                     nb_lc_units=nb_lc_units,
+                                                                                     lc_filter_length=lc_filter_length,
+                                                                                     l=l)
         handle.model = 'DeepSecS'
 
     print('Compiling model ...')
-    conv_net = DeepTrainer(net_arch)
-    conv_net.display_network_info()
-    conv_net.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
+    generator = DeepTrainer(generator_arc)
+    generator.display_network_info()
+    generator.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
+
+    discriminator = DeepTrainer(discriminator_arc)
+    discriminator.display_network_info()
+    discriminator.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
+
+    gen_dis = DeepTrainer(gen_dis_arc)
+    gen_dis.display_network_info()
+    gen_dis.compile(optimizer=optimizer, lr=rate, clipnorm=clipnorm, mode=mode)
 
     print('Started training at {}'.format(time.asctime()))
 
     rl = ReduceLROnPlateau(factor=.2, patience=10)
 
-    x_valid, y_valid = conv_net.fit(x_data, y_data,
+    index_array = np.arange(nb_train_sample)
+    train_dis = True
+
+    x_train, x_valid, y_train, y_valid = train_test_split(x_data, y_data, test_size=validation, random_state=5)
+
+    x_gen, x_dis, y_gen, y_dis = train_test_split(x_train, y_train, test_size=.5, random_state=5)
+    x_gen_val, x_dis_val, y_gen_val, y_dis_val = train_test_split(x_valid, y_valid, test_size=.5, random_state=5)
+
+    for epoch in range(1, epochs+1):
+        """callbacks.on_epoch_begin(epoch)
+        if shuffle == 'batch':
+            index_array = batch_shuffle(index_array, batch_size)
+        elif shuffle:
+            np.random.shuffle(index_array)"""
+
+        epoch_start = time.time()
+
+        batches = make_batches(min(len(x_gen), len(x_dis)), batch_size)
+        epoch_logs = {}
+        for batch_index, (batch_start, batch_end) in enumerate(batches):
+            print('Epoch %d, batch %d out of %d' % (epoch, batch_index, len(batches)))
+            batch_ids = index_array[batch_start:batch_end]
+
+            # Train the generator on half the samples for classification accuracy
+            generator.network.train_on_batch(x_dis[batch_ids], y_dis[batch_ids])
+            generated_ys = generator.predict(x_gen[batch_ids])
+
+            # Build the discriminator batch
+            dis_x_batch = np.concatenate((np.concatenate((x_dis[batch_ids], y_dis[batch_ids]), axis=-1),
+                                          np.concatenate((x_gen[batch_ids], generated_ys), axis=-1)), axis=0)
+            dis_y_batch = np.array([0]*len(batch_ids) + [1]*len(batch_ids))
+            dis_x_batch, dis_y_batch = shuffle_in_unison(dis_x_batch, dis_y_batch)
+
+            # Train the discriminator (only if the accuracy on the last batch was lower then 80%)
+            discriminator.network.trainable = True
+            if train_dis:
+                _, dis_batch_acc = discriminator.network.train_on_batch(dis_x_batch, dis_y_batch)
+
+                if dis_batch_acc > .8:
+                    train_dis = False
+            else:
+                _, dis_batch_acc = discriminator.network.test_on_batch(dis_x_batch, dis_y_batch)
+
+                if dis_batch_acc < .8:
+                    train_dis = True
+
+            # Train the generator on the second half of samples for classification accuracy and discriminator error
+            discriminator.network.trainable = False
+            gen_dis.network.train_on_batch(x_gen[batch_ids], [y_gen[batch_ids], np.array([1]*len(batch_ids))])
+
+            #callbacks.on_batch_end(batch_index, batch_logs)
+
+            if batch_index == len(batches) - 1:  # last batch
+                gen_loss, gen_acc = generator.score(x_valid, y_valid)
+
+                generated_ys = generator.predict(x_gen_val)
+                dis_x_valid = np.concatenate((np.concatenate((x_dis_val, y_dis_val), axis=-1),
+                                              np.concatenate((x_gen_val, generated_ys), axis=-1)), axis=0)
+                dis_y_valid = np.array([0] * len(x_dis_val) + [1] * len(x_gen_val))
+                dis_x_valid, dis_y_valid = shuffle_in_unison(dis_x_valid, dis_y_valid)
+
+                dis_loss, dis_acc = discriminator.score(dis_x_valid, dis_y_valid)
+
+                print('Epoch %d: time - %.2f secs, G loss - %f, G accuracy - %.3f, D loss - %f, D accuracy - %.3f'
+                      % (epoch, time.time()-epoch_start, gen_loss, gen_acc*100, dis_loss, dis_acc*100))
+
+        """callbacks.on_epoch_end(epoch, epoch_logs)
+        if callback_model.stop_training:
+            break
+    callbacks.on_train_end()"""
+
+    x_valid, y_valid = generator.fit(x_data, y_data,
                                     nb_epoch=epochs,
                                     batch_size=batch_size,
                                     validate=validation,
@@ -111,10 +193,10 @@ def supervised(x_data, y_data, handle,
                                     reduce_factor=.2)
 
     print('Testing model ...')
-    score = conv_net.score(x_valid, y_valid)
+    score = generator.score(x_valid, y_valid)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(score[0], 100 * score[1]))
 
-    prediction = conv_net.predict(x_data)
+    prediction = generator.predict(x_data)
     with open('tmp/cullPDB_%.2f.txt' % score[0], 'w') as f:
         for i in range(x_data.shape[0]):
             f.write(hot2aa(x_data[i,:,:22]))
@@ -129,7 +211,7 @@ def supervised(x_data, y_data, handle,
     dataset_options['pad_y_data'] = True
     x_data, y_data = load_dataset(data_id='cb513', **dataset_options)
     x_data = augment(x_data, embeddings, data_id='cb513', **dataset_options)
-    cb513_score = conv_net.score(x_data, y_data)
+    cb513_score = generator.score(x_data, y_data)
     print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(cb513_score[0], 100 * cb513_score[1]))
 
     if not(dataset_options['extra_features'] or dataset_options['pssm'] or dataset_options['codon_table']):
@@ -139,10 +221,10 @@ def supervised(x_data, y_data, handle,
         dataset_options.pop('extra_features')
         x_data, y_data = load_dataset(data_id='casp10', **dataset_options, min_aa=700, max_aa=700)
         x_data = augment(x_data, embeddings, data_id='casp10', **dataset_options)
-        casp10_score = conv_net.score(x_data, y_data)
+        casp10_score = generator.score(x_data, y_data)
         print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp10_score[0], 100 * casp10_score[1]))
 
-        prediction = conv_net.predict(x_data)
+        prediction = generator.predict(x_data)
         with open('tmp/casp10_%.2f.txt' % score[0], 'w') as f:
             for i in range(x_data.shape[0]):
                 f.write(hot2aa(x_data[i, :, :]))
@@ -156,14 +238,14 @@ def supervised(x_data, y_data, handle,
         print('Testing model with CASP11...')
         x_data, y_data = load_dataset(data_id='casp11', **dataset_options, min_aa=700, max_aa=700)
         x_data = augment(x_data, embeddings, data_id='casp11', **dataset_options)
-        casp11_score = conv_net.score(x_data, y_data)
+        casp11_score = generator.score(x_data, y_data)
         print('Test Loss:{0:.6f}, Test Accuracy: {1:.2f}%'.format(casp11_score[0], 100 * casp11_score[1]))
     else:
         casp10_score = (0, 0)
         casp11_score = (0, 0)
 
-    conv_net.save_train_history(handle)
-    conv_net.save_model_to_file(handle)
+    generator.save_train_history(handle)
+    generator.save_model_to_file(handle)
 
     with open('ResultsDB.txt', mode='a') as file:
         file.write('%d;%d;' % (epochs, batch_size) + str(filters) + ';' + str(filter_length) +
@@ -176,6 +258,56 @@ def supervised(x_data, y_data, handle,
                    % (score[0], 100 * score[1], cb513_score[0], 100 * cb513_score[1], casp10_score[0],
                       100 * casp10_score[1], casp11_score[0], 100 * casp11_score[1]))
     return score, cb513_score, casp10_score, casp11_score, handle
+
+
+def make_batches(size, batch_size):
+    '''Returns a list of batch indices (tuples of indices).
+    '''
+    nb_batch = int(np.ceil(size / float(batch_size)))
+    return [(i * batch_size, min(size, (i + 1) * batch_size))
+            for i in range(0, nb_batch)]
+
+
+def shuffle_in_unison(a, b):
+    assert len(a) == len(b)
+    shuffled_a = np.empty(a.shape, dtype=a.dtype)
+    shuffled_b = np.empty(b.shape, dtype=b.dtype)
+    permutation = np.random.permutation(len(a))
+    for old_index, new_index in enumerate(permutation):
+        shuffled_a[new_index] = a[old_index]
+        shuffled_b[new_index] = b[old_index]
+    return shuffled_a, shuffled_b
+
+
+def slice_X(X, start=None, stop=None):
+    '''This takes an array-like, or a list of
+    array-likes, and outputs:
+        - X[start:stop] if X is an array-like
+        - [x[start:stop] for x in X] if X in a list
+
+    Can also work on list/array of indices: `slice_X(x, indices)`
+
+    # Arguments:
+        start: can be an integer index (start index)
+            or a list/array of indices
+        stop: integer (stop index); should be None if
+            `start` was a list.
+    '''
+    if isinstance(X, list):
+        if hasattr(start, '__len__'):
+            # hdf5 datasets only support list objects as indices
+            if hasattr(start, 'shape'):
+                start = start.tolist()
+            return [x[start] for x in X]
+        else:
+            return [x[start:stop] for x in X]
+    else:
+        if hasattr(start, '__len__'):
+            if hasattr(start, 'shape'):
+                start = start.tolist()
+            return X[start]
+        else:
+            return X[start:stop]
 
 
 def get_args(kwargs, args):
@@ -230,22 +362,22 @@ if __name__ == '__main__':
     parser.add_argument("data_id",
                         help='The protein dataset to be trained on.')
 
-    parser.add_argument("--filters",
+    parser.add_argument("--filters", default=64,
                         help='Number of filters in the convolutional layers.')
 
-    parser.add_argument("--filter_length",
+    parser.add_argument("--filter_length", default='[11,7,11,15]',
                         help='Size of filters in the first convolutional layer.')
 
     parser.add_argument("--no_pad", action='store_true',
                         help='Toggle to pad protein sequences. Batch size auto-change to 1.')
 
-    parser.add_argument("--conv", type=int,
+    parser.add_argument("--conv", type=int, default=3,
                         help='number of conv layers.')
 
-    parser.add_argument("--fc", type=int,
+    parser.add_argument("--fc", type=int, default=0,
                         help='number of fc layers.')
 
-    parser.add_argument("--lstm", type=int, default=1,
+    parser.add_argument("--lstm", type=int, default=0,
                         help='number of fc layers.')
 
     parser.add_argument("-e", "--epochs", default=50, type=int,
