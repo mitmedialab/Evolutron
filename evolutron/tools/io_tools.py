@@ -199,12 +199,18 @@ def tab_parser(filename, codes=False, key='fam', nb_aa=20):
     x_data = raw_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
 
     if codes:
-        pf = raw_data[key].astype('category')
-        raw_data['codes'] = pf.cat.codes
-        pos_data = raw_data[raw_data['codes'] > 0]
-        y_data = pos_data.codes.tolist()
-        y_data = [y + 1 for y in y_data]
-        x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+        if type(key) == str:
+            pf = raw_data[key].astype('category')
+            raw_data['codes'] = pf.cat.codes
+            pos_data = raw_data[raw_data['codes'] > 0]
+            y_data = pos_data.codes.tolist()
+            y_data = [y + 1 for y in y_data]
+            x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+        else:
+            pf = raw_data[key]
+            pos_data = raw_data[pf[key[0]].notnull() & pf[key[1]].notnull()]
+            y_data = [pos_data[k].astype('category').cat.codes for k in key]
+            x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
     else:
         y_data = None
 

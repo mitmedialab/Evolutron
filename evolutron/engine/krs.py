@@ -72,7 +72,9 @@ class DeepTrainer:
         mode = {'NaNGuardMode': NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True),
                 None: None}
 
-        self.network.compile(loss=self.network._loss_function,
+        # ToDO: Changed the loss to support multi outputs. CHECK!!!
+        #self.network.compile(loss=self.network._loss_function,
+        self.network.compile(loss=options.get('loss_function', self.network._loss_function),
                              loss_weights=options.get('loss_weights', None),
                              optimizer=opts[optimizer],
                              metrics=self.network.metrics,
@@ -127,8 +129,16 @@ class DeepTrainer:
         else:
             stratify = None
 
-        x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
-        y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
+        if len(x_data) == len(y_data):
+            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+            y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
+        else:
+            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify[1])
+            y_train_0, y_valid_0 = self._check_and_split_data(y_data[0], self.output[0], validate, stratify[1])
+            y_train_1, y_valid_1 = self._check_and_split_data(y_data[1], self.output[1], validate, stratify[1])
+            y_train_2, y_valid_2 = self._check_and_split_data(y_data[2], self.output[2], validate, stratify[1])
+            y_train = [y_train_0, y_train_1, y_train_2]
+            y_valid = [y_valid_0, y_valid_1, y_valid_2]
 
         # if self.classification:
         #     msg = 'Distribution of Examples per set'

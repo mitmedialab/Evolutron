@@ -13,8 +13,7 @@ def mean_cat_acc(y_true, y_pred):
     real_len = K.sum(y_true)
     is_real = K.sum(y_true, -1)
     #y_true = K.concatenate([y_true, K.epsilon() * K.max(K.ones_like(y_true), -1, keepdims=True)])
-    s = K.sum(K.equal(K.argmax(y_true, axis=-1),
-                  K.argmax(y_pred, axis=-1)) * is_real)
+    s = K.sum(K.cast(K.equal(K.argmax(y_true, axis=-1), K.argmax(y_pred, axis=-1)), 'float32') * is_real)
     return s/real_len
 
 

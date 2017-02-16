@@ -26,7 +26,8 @@ file_db = {
     'hsapx': 'sprot_hsapiens_expr_pfam.tsv',
     'scop': 'scop2.fasta',
     'swissprot': 'sprot_all_pfam.tsv',
-    'acetyl': 'sprot_ec2_3_pfam.tsv'
+    'acetyl': 'sprot_ec2_3_pfam.tsv',
+    'small_all': 'small_uniprot-all.tsv'
 }
 
 
@@ -101,10 +102,10 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
         # x_data: observations
         # y_data: class labels
         try:
-            assert (len(x_data) == len(y_data))
+            assert ((len(x_data) == len(y_data)) or (len(x_data) == len(y_data[0])))
         except AssertionError:
-            raise IOError('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data)))
+            raise IOError('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data[0])))
 
         print('Dataset size: {0}'.format(data_size))
-        return x_data, np.asarray(y_data, dtype=np.int32)
+        return x_data, np.asarray(y_data)
 
