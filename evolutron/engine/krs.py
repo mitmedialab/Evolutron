@@ -11,9 +11,7 @@ from tabulate import tabulate
 
 import keras.backend as K
 import keras.optimizers as opt
-from keras.callbacks import EarlyStopping
-from keras.callbacks import ModelCheckpoint, TensorBoard
-from keras.callbacks import ReduceLROnPlateau
+from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 
 try:
@@ -93,11 +91,80 @@ class DeepTrainer:
 
         self._funcs_init = True
 
-    def fit_generator(self):
+    """def fit_generator(self):
         # TODO: if dataset is big
         # fit_generator(self, generator, samples_per_epoch, nb_epoch, verbose=1, callbacks=[], validation_data=None,
         # nb_val_samples=None, class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False)
-        raise NotImplementedError
+        raise NotImplementedError"""
+    def fit_generator(self, x_data, y_data, generator, nb_classes, nb_epoch=1, batch_size=64, shuffle=True,
+                      validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
+                      reduce_factor=.5, classes=[]):
+
+        # Check arguments
+        if extra_callbacks is None:
+            extra_callbacks = []
+        assert (validate >= 0)
+        assert nb_epoch > 0
+
+        if self.classification:
+            stratify = y_data  # TODO: here you should select with which part to stratify
+        else:
+            stratify = None
+
+        if len(x_data) == len(y_data):  # TODO: this is not a good condition, we have do find a better way than len
+            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+            y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
+        else:
+            uni = np.unique(y_data[0], return_index=True, return_counts=True)
+            stratify = None
+            """for i, v in enumerate(uni[2]):
+                if v < 2:
+                    stratify[uni[1][i]] = 0"""
+            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+            y_train = [[] for _ in y_data]
+            y_valid = [[] for _ in y_data]
+            for i, y_d in enumerate(y_data):
+                y_train[i], y_valid[i] = self._check_and_split_data(y_d, x_data, validate, stratify)
+
+        # Callbacks
+        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
+                                      patience=patience / 2, min_lr=0.001, verbose=1)
+        rn = np.random.random()
+        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
+                                     save_best_only=True, save_weights_only=True)
+
+        if K.backend() == "tensorflow":
+            tb = TensorBoard()
+            callbacks = [es, reduce_lr, checkpoint, tb]
+        else:
+            callbacks = [es, reduce_lr, checkpoint]
+
+        start_time = time.time()
+        try:
+            print(len(y_train), len(y_train[0]))
+            self.network.fit_generator(generator=generator((x_train, y_train), batch_size=batch_size,
+                                                           shuffle=shuffle, classes=classes),
+                                       samples_per_epoch=len(x_train),
+                                       nb_epoch=nb_epoch,
+                                       verbose=verbose,
+                                       callbacks=callbacks + extra_callbacks,
+                                       validation_data=generator((x_valid, y_valid), classes=classes,
+                                                                 batch_size=batch_size),
+                                       nb_val_samples=len(x_valid))
+
+        except KeyboardInterrupt:
+            return
+
+        if return_best_model:
+            self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+
+        self.history = self.network.history
+
+        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
+                                                                          time.time() - start_time))
+
+        return x_valid, y_valid
 
     @staticmethod
     def _check_and_split_data(data, check_var, test_size=.0, stratify=None):
@@ -108,7 +175,10 @@ class DeepTrainer:
                 raise ValueError('Number of inputs does not match model inputs.')
             return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
         elif isinstance(data, list):
-            assert (len(data) == len(check_var)), 'Number of inputs does not match model inputs.'
+            if isinstance(check_var, list):
+                assert (len(data) == len(check_var)), 'Number of inputs does not match model inputs.'
+            else:
+                assert (len(data) == check_var.shape[0]), 'Number of inputs does not match model inputs.'
             train, test = zip(
                 *[train_test_split(d, test_size=test_size, stratify=stratify, random_state=5) for d in data])
             return list(train), list(test)
@@ -127,7 +197,7 @@ class DeepTrainer:
         assert nb_epoch > 0
 
         if self.classification:
-            stratify = y_data[1]  # TODO: here you should select with which part to stratify
+            stratify = y_data  # TODO: here you should select with which part to stratify
         else:
             stratify = None
 
@@ -135,12 +205,30 @@ class DeepTrainer:
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
+            stratify = None
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
             y_train = [[] for _ in y_data]
             y_valid = [[] for _ in y_data]
 
             for i, y_d in enumerate(y_data):
                 y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
+
+        # if self.classification:
+        #     msg = 'Distribution of Examples per set'
+        #     print(msg)
+        #     print('-' * len(msg))
+        #     classes = ['Class ' + str(i) for i in range(len(np.unique(y_data)))]
+        #     counts = dict()
+        #     _, c = np.unique(y_train, return_counts=True)
+        #     counts['train'] = c
+        #     _, c = np.unique(y_valid, return_counts=True)
+        #     counts['valid'] = c
+        #
+        #     print(tabulate([['Set'] + classes + ['Total'],
+        #                     ['Train'] + counts['train'].tolist() + [counts['train'].sum()],
+        #                     ['Valid'] + counts['valid'].tolist() + [counts['valid'].sum()]],
+        #                    stralign='center',
+        #                    headers="firstrow"))
 
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')

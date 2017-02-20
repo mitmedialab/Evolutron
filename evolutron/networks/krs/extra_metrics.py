@@ -17,6 +17,12 @@ def mean_cat_acc(y_true, y_pred):
     return s/real_len
 
 
+def multiclass_acc(y_true, y_pred):
+    y_pred = K.round(y_pred)
+
+    return K.sum(K.equal(y_true, y_pred))/K.prod(K.shape(y_true))
+
+
 def multiclass_precision(y_true, y_pred):
     """This metric return a precision score for each class"""
     nb_categories = K.shape(y_true)[-1]

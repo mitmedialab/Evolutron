@@ -207,9 +207,10 @@ def tab_parser(filename, codes=False, key='fam', nb_aa=20):
             y_data = [y + 1 for y in y_data]
             x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
         else:
+            # ToDO: I changed this part to return the unprocessed labels (the goal is to support multiclasses)
             pf = raw_data[key]
             pos_data = raw_data[pf[key[0]].notnull() & pf[key[1]].notnull()]
-            y_data = [pos_data[k].astype('category').cat.codes for k in key]
+            y_data = [pos_data[k].tolist() for k in key]
             x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
     else:
         y_data = None

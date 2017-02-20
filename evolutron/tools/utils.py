@@ -43,3 +43,29 @@ def count_lines(f):
             yield b
 
     return sum(bl.count("\n") for bl in blocks(f))
+
+
+def nested_to_categorical(arr, classes=[]):
+    flat = []
+    for a in arr:
+        flat += a
+
+    u, idx = np.unique(np.concatenate((flat, classes)), return_inverse=True)
+
+    categorical = np.zeros((len(arr), len(u)))
+
+    count = 0
+    for i in range(len(arr)):
+        for j in range(len(arr[i])):
+            categorical[i, idx[count]] = 1
+            count += 1
+
+    return categorical
+
+
+def nested_unique(arr):
+    flat = []
+    for a in arr:
+        flat += a
+
+    return np.unique(flat)

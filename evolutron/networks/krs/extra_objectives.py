@@ -3,6 +3,18 @@ import keras.backend as K
 Beta = 1
 
 
+def multiclass_categorical_crossentropy(output, target):
+    """Categorical crossentropy between an output tensor
+    and a target tensor, where the target is a tensor of the same
+    shape as the output. Supports multiclass classification.
+    """
+
+    # manual computation of crossentropy
+    epsilon = K.epsilon()
+    output = K.clip(output, epsilon, 1. - epsilon)
+    return K.mean(- K.sum(target * K.log(output), axis=-1))
+
+
 def pred_pos_approx(y_pred, category):
     #nb_categories = K.shape(y_pred)[-1]
     nb_categories = 8
