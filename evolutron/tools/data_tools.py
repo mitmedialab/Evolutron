@@ -29,6 +29,8 @@ file_db = {
     'acetyl': '/data/datasets/sprot_ec2_3_pfam.tsv',
     'small_all': '/data/datasets/small_uniprot-all.tsv',
     'mycoplasma': '/data/datasets/uniprot_mycoplasma_pfam.tsv',
+    'small_all': '/data/datasets/small_uniprot-all.tsv',
+    'go': '/data/datasets/sprot_go.tsv'
 }
 
 
