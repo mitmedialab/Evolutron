@@ -155,7 +155,7 @@ class Convolution1D(Layer):
                                     self.filter_length,
                                     self.border_mode,
                                     self.subsample[0])
-        return (input_shape[0], length, self.nb_filter)
+        return input_shape[0], length, self.nb_filter
 
     def call(self, x, mask=None):
         x = K.expand_dims(x, 2)  # add a dummy dimension

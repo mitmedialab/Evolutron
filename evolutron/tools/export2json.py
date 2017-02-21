@@ -17,7 +17,6 @@ from evolutron.tools import load_dataset, num2aa, hot2num
 
 # noinspection PyShadowingNames
 def get_matches(motif_fun, out_fun, x_train):
-
     # Calculate the motif scores and output scores for each protein in data set
     motif_scores = [np.squeeze(motif_fun([x]), 0) for x in x_train]
     output_scores = [np.squeeze(out_fun([x]), 0) for x in x_train]
@@ -48,7 +47,7 @@ def main(filename):
     elif filename.find('m6a') > 0:
         inputs = ten.tensor3('inputs')
         network = nets.build_network_m6a(inputs, filters, filter_size)
-        raw_data = parse.m6a(padded=False,probe='1')
+        raw_data = parse.m6a(padded=False, probe='1')
     elif filename.find('type2p_pad') > 0:
         inputs = ten.tensor3('inputs')
         network = nets.build_network_type2p_padded(inputs, 700, filters, filter_size)

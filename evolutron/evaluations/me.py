@@ -39,7 +39,7 @@ def plot_cm_all_folds(y_classes, val_classes, n_folds=10):
 
 # noinspection PyShadowingNames
 def plot_roc_all_folds(y_classes, val_preds, n_folds=10):
-    fig2, ax2 = plt.subplots(nrows=2, ncols=5, sharex=True, sharey=True, figsize=(15,15), facecolor='white')
+    fig2, ax2 = plt.subplots(nrows=2, ncols=5, sharex=True, sharey=True, figsize=(15, 15), facecolor='white')
     fig2.subplots_adjust(wspace=0.2, hspace=0.2)
     ax2 = ax2.reshape(n_folds)
     for fold in xrange(n_folds):
@@ -55,7 +55,7 @@ def plot_roc_all_folds(y_classes, val_preds, n_folds=10):
         ax2[fold].set_ylim([0.0, 1.0])
         ax2[fold].set_xlabel('False Positive Rate')
         ax2[fold].set_ylabel('True Positive Rate')
-        ax2[fold].set_title('Fold {0}'.format(fold+1))
+        ax2[fold].set_title('Fold {0}'.format(fold + 1))
     ax2[0].legend(bbox_to_anchor=(0., 1.02, 1., .3), loc=3, borderaxespad=0., mode='expand', ncol=3)
     fig2.suptitle('ROC curves')
 
@@ -94,7 +94,6 @@ plt.ylabel('Precision')
 plt.title('Precision-Recall curve'.format())
 plt.show()
 
-
 # Micro-average ROC curve and ROC area
 y = np.concatenate([y for y in y_classes])
 pred = np.concatenate([p for p in val_preds])
@@ -112,7 +111,6 @@ plt.xlabel('False positive')
 plt.ylabel('True positive')
 plt.title('ROC curve')
 plt.show()
-
 
 #  Micro-average Precision-recall curve and AUC
 y_train = np.concatenate([y for y in y_train_classes])
