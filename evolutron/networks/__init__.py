@@ -1,7 +1,5 @@
 # coding=utf-8
 
-from .krs.cobind import DeepDNABind, DeepDNABindN
-
 from . import extra_layers as extra
 custom_layers = {
     'Convolution1D': extra.Convolution1D,

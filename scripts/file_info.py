@@ -127,22 +127,22 @@ def main(filename, **options):
         with np.load(filename) as f:
             try:
                 if len(f.files) == 2:
-                    train_err_mem = f['train_err_mem'] 
+                    train_err_mem = f['train_err_mem']
                     val_err_mem = f['val_err_mem']
                     train_acc_mem = ['NA']
                     val_acc_mem = ['NA']
-                else :
-                    train_err_mem = f['train_err_mem'] 
-                    val_err_mem = f['val_err_mem']     
-                    train_acc_mem = f['train_acc_mem'] 
+                else:
+                    train_err_mem = f['train_err_mem']
+                    val_err_mem = f['val_err_mem']
+                    train_acc_mem = f['train_acc_mem']
                     val_acc_mem = f['val_acc_mem']
             except:
                 raise IOError('Invompatible history file')
-            
+
             print('Model was trained for {0} epochs'.format(len(train_err_mem)))
             print('Best training error was: {0}'.format(train_err_mem[-1]))
             print('Best validation error was: {0}'.format(val_err_mem[-1]))
-            
+
             print('Best training accuracy was: {0}'.format(train_acc_mem[-1]))
             print('Best validation accuracy was: {0}'.format(val_acc_mem[-1]))
 

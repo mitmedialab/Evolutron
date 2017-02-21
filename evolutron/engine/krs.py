@@ -6,22 +6,20 @@ import os
 import time
 from collections import OrderedDict, defaultdict
 
+import numpy as np
+from tabulate import tabulate
+
 import keras.backend as K
 import keras.optimizers as opt
-import numpy as np
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras.callbacks import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
-from tabulate import tabulate
 
 try:
     from theano.compile.nanguardmode import NanGuardMode
-except:
+except ImportError:
     pass
-
-
-# TODO: implement enhanced progbar logger
 
 
 class DeepTrainer:
@@ -125,20 +123,25 @@ class DeepTrainer:
         assert nb_epoch > 0
 
         if self.classification:
-            stratify = y_data
+            stratify = y_data[1]  # TODO: here you should select with which part to stratify
         else:
             stratify = None
 
-        if len(x_data) == len(y_data):
+        if len(x_data) == len(y_data):  # TODO: this is not a good condition, we have do find a better way than len
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
-            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify[1])
-            y_train_0, y_valid_0 = self._check_and_split_data(y_data[0], self.output[0], validate, stratify[1])
-            y_train_1, y_valid_1 = self._check_and_split_data(y_data[1], self.output[1], validate, stratify[1])
-            y_train_2, y_valid_2 = self._check_and_split_data(y_data[2], self.output[2], validate, stratify[1])
-            y_train = [y_train_0, y_train_1, y_train_2]
-            y_valid = [y_valid_0, y_valid_1, y_valid_2]
+            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+            y_train = y_valid = [[] for _ in y_data]
+            for i, y_d in enumerate(y_data):
+                y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
+
+                # y_train_0, y_valid_0 = self._check_and_split_data(y_data[0], self.output[0], validate, stratify)
+                # y_train_1, y_valid_1 = self._check_and_split_data(y_data[1], self.output[1], validate, stratify)
+                # y_train_2, y_valid_2 = self._check_and_split_data(y_data[2], self.output[2], validate, stratify)
+                # y_train = [y_train_0, y_train_1, y_train_2]
+                # y_valid = [y_valid_0, y_valid_1, y_valid_2]
+
 
         # if self.classification:
         #     msg = 'Distribution of Examples per set'
@@ -182,7 +185,7 @@ class DeepTrainer:
                              verbose=verbose)
 
         except KeyboardInterrupt:
-            pass
+            return
 
         if return_best_model:
             self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
