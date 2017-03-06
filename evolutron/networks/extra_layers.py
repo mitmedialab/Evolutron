@@ -1,21 +1,19 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 import keras.backend as K
 import numpy as np
 from keras import activations, initializations, regularizers, constraints
+from keras.activations import relu
 from keras.engine import InputSpec
+from keras.initializations import glorot_uniform
+from keras.layers import LocallyConnected1D
 from keras.layers.pooling import _Pooling1D
+from keras.layers.recurrent import Recurrent, time_distributed_dense
 from keras.models import Layer
 from keras.utils.np_utils import conv_output_length
-from keras.layers.recurrent import Recurrent, time_distributed_dense
-from keras.activations import relu
-from keras.initializations import glorot_uniform
-from keras.layers import LocallyConnected1D, ZeroPadding1D
 
 
 class Convolution1D(Layer):
-    '''Convolution operator for filtering neighborhoods of one-dimensional inputs.
+    """Convolution operator for filtering neighborhoods of one-dimensional inputs.
     When using this layer as the first layer in a model,
     either provide the keyword argument `input_dim`
     (int, e.g. 128 for sequences of 128-dimensional vectors),
@@ -78,7 +76,7 @@ class Convolution1D(Layer):
     # Output shape
         3D tensor with shape: `(samples, new_steps, nb_filter)`.
         `steps` value might have changed due to padding.
-    '''
+    """
 
     def __init__(self, nb_filter, filter_length,
                  init='uniform', activation='linear', weights=None,
@@ -247,7 +245,6 @@ class Deconvolution1D(Layer):
             self.W_shape = (self.filter_length, 1, input_dim, self.nb_filter)
             self.W = self.init(self.W_shape, name='{}_W'.format(self.name))
 
-
         if self.bias:
             self.b = K.zeros((self.nb_filter,), name='{}_b'.format(self.name))
             self.trainable_weights = [self.b]
@@ -297,7 +294,7 @@ class Deconvolution1D(Layer):
         # To do in the last only
         if self.apply_mask:
             mask = K.repeat_elements(K.expand_dims(mask, 2), self.nb_filter, 2)
-            output = output * mask
+            output = output * K.cast(mask, 'float32')
         return output
 
     def get_config(self):
@@ -387,6 +384,7 @@ class AtrousConvolution1D(Convolution1D):
         3D tensor with shape: `(samples, new_steps, nb_filter)`.
         `steps` value might have changed due to padding.
     '''
+
     def __init__(self, nb_filter, filter_length,
                  init='uniform', activation='linear', weights=None,
                  border_mode='valid', subsample_length=1, atrous_rate=1,
@@ -505,6 +503,7 @@ class Convolution2D(Layer):
         `(samples, new_rows, new_cols, nb_filter)` if dim_ordering='tf'.
         `rows` and `cols` values might have changed due to padding.
     '''
+
     def __init__(self, nb_filter, nb_row, nb_col,
                  init='glorot_uniform', activation='linear', weights=None,
                  border_mode='valid', subsample=(1, 1), dim_ordering='default',
@@ -890,7 +889,7 @@ class Dedense(Layer):
 
 
 class MaxPooling1D(_Pooling1D):
-    '''Max pooling operation for temporal data.
+    """Max pooling operation for temporal data.
 
     # Input shape
         3D tensor with shape: `(samples, steps, features)`.
@@ -905,7 +904,7 @@ class MaxPooling1D(_Pooling1D):
             If None, it will default to `pool_length`.
         border_mode: 'valid' or 'same'.
             Note: 'same' will only work with TensorFlow for the time being.
-    '''
+    """
 
     def __init__(self, pool_length=2, stride=None,
                  border_mode='valid', **kwargs):
@@ -979,7 +978,7 @@ class Unpooling1D(Layer):
 
 
 class Flatten(Layer):
-    '''Flattens the input. Does not affect the batch size.
+    """Flattens the input. Does not affect the batch size.
 
     # Example
 
@@ -991,7 +990,7 @@ class Flatten(Layer):
         model.add(Flatten())
         # now: model.output_shape == (None, 65536)
     ```
-    '''
+    """
 
     def __init__(self, **kwargs):
         self.supports_masking = True
@@ -1013,7 +1012,7 @@ class Flatten(Layer):
 
 
 class Reshape(Layer):
-    '''Reshapes an output to a certain shape.
+    """Reshapes an output to a certain shape.
 
     # Arguments
         target_shape: target shape. Tuple of integers,
@@ -1041,7 +1040,7 @@ class Reshape(Layer):
         model.add(Reshape((6, 2)))
         # now: model.output_shape == (None, 6, 2)
     ```
-    '''
+    """
 
     def __init__(self, target_shape, **kwargs):
         self.supports_masking = True
@@ -1154,6 +1153,7 @@ class feedForwardLSTM(Recurrent):
         - [Supervised sequence labeling with recurrent neural networks](http://www.cs.toronto.edu/~graves/preprint.pdf)
         - [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](http://arxiv.org/abs/1512.05287)
     '''
+
     def __init__(self, output_dim,
                  init='glorot_uniform', inner_init='orthogonal',
                  forget_bias_init='one', activation='tanh',
@@ -1202,6 +1202,7 @@ class feedForwardLSTM(Recurrent):
                                              np.zeros(self.output_dim),
                                              np.zeros(self.output_dim))),
                                   name='{}_b'.format(self.name))
+
             self.b = self.add_weight((self.output_dim * 4,),
                                      initializer=b_reg,
                                      name='{}_b'.format(self.name),
@@ -1358,7 +1359,6 @@ class feedForwardLSTM(Recurrent):
 
         return relu(output)
 
-
     def get_constants(self, x):
         constants = []
         if 0 < self.dropout_U < 1:
@@ -1463,6 +1463,7 @@ class LocallyConnected1D(Layer):
         3D tensor with shape: `(samples, new_steps, nb_filter)`.
         `steps` value might have changed due to padding.
     '''
+
     def __init__(self, nb_filter, filter_length,
                  init='glorot_uniform', activation=None, weights=None,
                  border_mode='valid', subsample_length=1,
@@ -1504,7 +1505,7 @@ class LocallyConnected1D(Layer):
         self.W_shape = (output_length,
                         self.filter_length * input_dim,
                         nb_filter)
-        #self.W_shape = (nb_filter, input_shape[1], input_dim)
+        # self.W_shape = (nb_filter, input_shape[1], input_dim)
         self.W = self.add_weight(self.W_shape,
                                  initializer=self.init,
                                  name='{}_W'.format(self.name),
