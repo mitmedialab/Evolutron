@@ -67,8 +67,12 @@ class DeepTrainer:
                 'adamax': opt.Adamax(lr=options.get('lr', .002))
                 }
 
-        mode = {'NaNGuardMode': NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True),
-                None: None}
+        mode = options.get('mode', None)
+        if K.backend() == 'theano' and mode:
+            modes = {'NaNGuardMode': NanGuardMode(nan_is_error=True, inf_is_error=True, big_is_error=True),
+                     'MonitorMode': MonitorMode(pre_func=inspect_inputs, post_func=inspect_outputs),
+                     }
+            mode = modes[mode]
 
         # ToDO: Changed the loss to support multi outputs. CHECK!!!
         #self.network.compile(loss=self.network._loss_function,
@@ -76,7 +80,7 @@ class DeepTrainer:
                              loss_weights=options.get('loss_weights', None),
                              optimizer=opts[optimizer],
                              metrics=self.network.metrics,
-                             mode=mode[options.get('mode', None)])
+                             mode=mode)
         self._create_functions()
 
     def _create_functions(self):
@@ -132,33 +136,11 @@ class DeepTrainer:
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
-            y_train = y_valid = [[] for _ in y_data]
+            y_train = [[] for _ in y_data]
+            y_valid = [[] for _ in y_data]
+
             for i, y_d in enumerate(y_data):
                 y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
-
-                # y_train_0, y_valid_0 = self._check_and_split_data(y_data[0], self.output[0], validate, stratify)
-                # y_train_1, y_valid_1 = self._check_and_split_data(y_data[1], self.output[1], validate, stratify)
-                # y_train_2, y_valid_2 = self._check_and_split_data(y_data[2], self.output[2], validate, stratify)
-                # y_train = [y_train_0, y_train_1, y_train_2]
-                # y_valid = [y_valid_0, y_valid_1, y_valid_2]
-
-
-        # if self.classification:
-        #     msg = 'Distribution of Examples per set'
-        #     print(msg)
-        #     print('-' * len(msg))
-        #     classes = ['Class ' + str(i) for i in range(len(np.unique(y_data)))]
-        #     counts = dict()
-        #     _, c = np.unique(y_train, return_counts=True)
-        #     counts['train'] = c
-        #     _, c = np.unique(y_valid, return_counts=True)
-        #     counts['valid'] = c
-        #
-        #     print(tabulate([['Set'] + classes + ['Total'],
-        #                     ['Train'] + counts['train'].tolist() + [counts['train'].sum()],
-        #                     ['Valid'] + counts['valid'].tolist() + [counts['valid'].sum()]],
-        #                    stralign='center',
-        #                    headers="firstrow"))
 
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
@@ -331,3 +313,12 @@ class DeepTrainer:
         np.savez_compressed(filename, **self.history.history)
 
         print('History saved to: ' + filename)
+
+
+def inspect_inputs(i, node, fn):
+    print(i, node, "input(s) value(s):", [input[0] for input in fn.inputs],
+          end='')
+
+
+def inspect_outputs(i, node, fn):
+    print(" output(s) value(s):", [output[0] for output in fn.outputs])

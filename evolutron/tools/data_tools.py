@@ -4,30 +4,31 @@ import numpy as np
 from evolutron.tools import io_tools as io
 
 file_db = {
-    'random': 'random_aa.fasta',
-    'type2p': 'type2p_ps_aa.fasta',
-    'type2': 'sprot_type2_pfam.tsv',
-    'hsapiens': 'sprot_hsapiens_pfam.tsv',
-    'ecoli': 'sprot_ecoli_pfam.tsv',
-    'zinc': 'sprot_znf_prot_pfam.tsv',
-    'homeo': 'sprot_homeo_pfam.tsv',
-    'crispr': 'sprot_crispr_pfam.tsv',
-    'cas9': 'sprot_cas9_pfam.tsv',
-    'cd4': 'sprot_cd4_pfam.tsv',
-    'dnabind': 'sprot_dna_tf_pfam.tsv',
-    'SecS': 'SecS.sec',
-    'smallSecS': 'smallSecS.sec',
-    'tinySecS': 'tinySecS.sec',
-    'cullPDB': 'cullpdb+profile_6133_filtered.npy.gz',
-    'cb513': 'cb513+profile_split1.npy.gz',
-    'human_ors': 'uniprot_human_ors.tsv',
-    'casp10': 'casp10.sec',
-    'casp11': 'casp11.sec',
-    'hsapx': 'sprot_hsapiens_expr_pfam.tsv',
-    'scop': 'scop2.fasta',
-    'swissprot': 'sprot_all_pfam.tsv',
-    'acetyl': 'sprot_ec2_3_pfam.tsv',
-    'small_all': 'small_uniprot-all.tsv'
+    'random': '/data/datasets/random_aa.fasta',
+    'type2p': '/data/datasets/type2p_ps_aa.fasta',
+    'type2': '/data/datasets/sprot_type2_pfam.tsv',
+    'hsapiens': '/data/datasets/sprot_hsapiens_pfam.tsv',
+    'ecoli': '/data/datasets/sprot_ecoli_pfam.tsv',
+    'zinc': '/data/datasets/sprot_znf_prot_pfam.tsv',
+    'homeo': '/data/datasets/sprot_homeo_pfam.tsv',
+    'crispr': '/data/datasets/sprot_crispr_pfam.tsv',
+    'cas9': '/data/datasets/sprot_cas9_pfam.tsv',
+    'cd4': '/data/datasets/sprot_cd4_pfam.tsv',
+    'dnabind': '/data/datasets/sprot_dna_tf_pfam.tsv',
+    'SecS': '/data/datasets/SecS.sec',
+    'smallSecS': '/data/datasets/smallSecS.sec',
+    'tinySecS': '/data/datasets/tinySecS.sec',
+    'cullPDB': '/data/datasets/cullpdb+profile_6133_filtered.npy.gz',
+    'cb513': '/data/datasets/cb513+profile_split1.npy.gz',
+    'human_ors': '/data/datasets/uniprot_human_ors.tsv',
+    'casp10': '/data/datasets/casp10.sec',
+    'casp11': '/data/datasets/casp11.sec',
+    'hsapx': '/data/datasets/sprot_hsapiens_expr_pfam.tsv',
+    'scop': '/data/datasets/scop2.fasta',
+    'swissprot': '/data/datasets/sprot_all_pfam.tsv',
+    'acetyl': '/data/datasets/sprot_ec2_3_pfam.tsv',
+    'small_all': '/data/datasets/small_uniprot-all.tsv',
+    'mycoplasma': '/data/datasets/uniprot_mycoplasma_pfam.tsv',
 }
 
 
@@ -58,13 +59,13 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
         raise IOError('Dataset id not in file database.')
 
     if filetype == 'tsv':
-        x_data, y_data = io.tab_parser('datasets/' + filename, **parser_options)
+        x_data, y_data = io.tab_parser(filename, **parser_options)
     elif filetype == 'fasta':
-        x_data, y_data = io.fasta_parser('datasets/' + filename, **parser_options)
+        x_data, y_data = io.fasta_parser(filename, **parser_options)
     elif filetype == 'sec':
-        x_data, y_data = io.SecS_parser('datasets/' + filename, **parser_options)
+        x_data, y_data = io.SecS_parser(filename, **parser_options)
     elif filetype == 'gz':
-        x_data, y_data = io.npz_parser('datasets/' + filename, **parser_options)
+        x_data, y_data = io.npz_parser(filename, **parser_options)
     else:
         raise NotImplementedError('There is no parser for current file type.')
 
