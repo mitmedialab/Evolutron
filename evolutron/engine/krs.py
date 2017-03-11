@@ -72,13 +72,17 @@ class DeepTrainer:
                      }
             mode = modes[mode]
 
-        # ToDO: Changed the loss to support multi outputs. CHECK!!!
-        #self.network.compile(loss=self.network._loss_function,
-        self.network.compile(loss=options.get('loss_function', self.network._loss_function),
-                             loss_weights=options.get('loss_weights', None),
-                             optimizer=opts[optimizer],
-                             metrics=self.network.metrics,
-                             mode=mode)
+            self.network.compile(loss=options.get('loss_function', self.network._loss_function),
+                                 loss_weights=options.get('loss_weights', None),
+                                 optimizer=opts[optimizer],
+                                 metrics=self.network.metrics,
+                                 mode=mode)
+        else:
+            self.network.compile(loss=options.get('loss_function', self.network._loss_function),
+                                 loss_weights=options.get('loss_weights', None),
+                                 optimizer=opts[optimizer],
+                                 metrics=self.network.metrics)
+
         self._create_functions()
 
     def _create_functions(self):
