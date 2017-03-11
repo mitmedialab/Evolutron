@@ -77,11 +77,11 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
         else:
             max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
-        x_data = np.asarray([pad_or_clip_seq(x, max_aa) for x in x_data])
+        x_data = np.asarray([pad_or_clip_seq(x, max_aa) for x in x_data], dtype=np.float32)
 
         if min_aa:
             min_aa = max(min_aa, np.max([len(x) for x in x_data]))
-            x_data = np.asarray([pad_or_clip_seq(x, min_aa) for x in x_data])
+            x_data = np.asarray([pad_or_clip_seq(x, min_aa) for x in x_data], dtype=np.float32)
 
         if pad_y_data:
             try:
