@@ -9,44 +9,9 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot, SecS2hot_8cat, SecS2hot_3cat, aa2codon, hot2aa
+from .seq_tools import aa_map, nt_map, aa2hot, SecS2hot_8cat, SecS2hot_3cat, aa2codon, hot2aa
+from .utils import ZincFinger
 
-
-############################
-# -------- Classes ------- #
-############################
-class Protein(object):
-    def __init__(self, name, organism, aa_seq, nt_seq):
-        self.name = name
-        self.aa_seq = aa_seq
-        self.nt_seq = nt_seq
-        self.aa = str(self.aa_seq)
-        self.nt = str(self.nt_seq)
-        self.aa_num = len(aa_seq)
-        if nt_seq:
-            self.nt_num = len(nt_seq)
-        else:
-            self.nt_num = None
-        self.org = organism
-
-
-class ZincFinger(Protein):
-    def __init__(self, name, organism, aa_seq, nt_seq, pwm):
-        """
-
-        :type rec_site: Nucleotide sequence of the recognition site
-        """
-        Protein.__init__(self, name, organism, aa_seq, nt_seq)
-        self.pwm = pwm
-        self.rec_site = np.power(np.ones_like(pwm) * 2.0, pwm) * .25
-
-    def __str__(self):
-        return '{x.name} {x.nt_num} nt {x.aa_num} aa'.format(x=self)
-
-
-##############################
-# -------- Functions ------- #
-##############################
 
 def b1h(padded=False, min_aa=None, max_aa=None):
     filename = 'datasets/B1H.motifs.csv'
@@ -156,11 +121,10 @@ def type2p_code(description):
     return code.flatten()
 
 
-def fasta_parser(filename, codes=False):
+def fasta_parser(filename, codes=False, code_key=None, nb_aa=20):
     """
         This module parses data from FASTA files and transforms them to Evolutron format.
     """
-
     input_file = open(filename, "rU")
 
     aa_list = []
@@ -168,12 +132,21 @@ def fasta_parser(filename, codes=False):
     for record in SeqIO.parse(input_file, "fasta"):
         aa_list.append(str(record.seq))
         if codes:
-            if filename == 'datasets/scop2.fasta':
-                code_list.append(record.description.split('|')[-1])
-            else:
-                code_list.append(type2p_code(record.description))  # TODO: make this work with other codes too
+            try:
+                # TODO: Remove this dependency in projects by specifying the correct code
+                if filename == 'datasets/scop2.fasta':
+                    code_key = 'scop'
+                else:
+                    code_key = 'type2p'
 
-    x_data = list(map(aa2hot, aa_list))
+                if code_key == 'scop':
+                    code_list.append(record.description.split('|')[-1])
+                elif code_key == 'type2p':
+                    code_list.append(type2p_code(record.description))
+            except:
+                raise IOError('Fasta parser code option set to True, but code was not recognized')
+
+    x_data = list(map(lambda x: aa2hot(x, nb_aa), aa_list))
 
     if codes:
         y_data = code_list
@@ -183,7 +156,33 @@ def fasta_parser(filename, codes=False):
     return x_data, y_data
 
 
-def tab_parser(filename, codes=False, key='fam', nb_aa=20):
+def tab_parser(filename, codes=False, code_key=None, nb_aa=20):
+    def fam(x):
+        dt = str(x).split(',')
+        f = [d for d in dt if d.find(' family') >= 0]
+
+        try:
+            return f[0]
+        except IndexError:
+            return "Unassigned"
+
+    def supfam(x):
+        dt = str(x).split(',')
+        f = [d for d in dt if d.find('superfamily') >= 0]
+
+        try:
+            return f[0]
+        except IndexError:
+            return "Unassigned"
+
+    def subfam(x):
+        dt = str(x).split(',')
+        f = [d for d in dt if d.find('subfamily') >= 0]
+
+        try:
+            return f[0]
+        except IndexError:
+            return "Unassigned"
 
     try:
         raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
@@ -199,18 +198,18 @@ def tab_parser(filename, codes=False, key='fam', nb_aa=20):
     x_data = raw_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
 
     if codes:
-        if type(key) == str:
-            pf = raw_data[key].astype('category')
+        if type(code_key) == str:
+            pf = raw_data[code_key].astype('category')
             raw_data['codes'] = pf.cat.codes
             pos_data = raw_data[raw_data['codes'] > 0]
             y_data = pos_data.codes.tolist()
             y_data = [y + 1 for y in y_data]
             x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
         else:
-            # ToDO: I changed this part to return the unprocessed labels (the goal is to support multiclasses)
-            pf = raw_data[key]
-            pos_data = raw_data[pf[key[0]].notnull() & pf[key[1]].notnull()]
-            y_data = [pos_data[k].tolist() for k in key]
+            # ToDO: I changed this part to return the unprocessed labels (the goal is to support multiclasses) example ?
+            pf = raw_data[code_key]
+            pos_data = raw_data[pf[code_key[0]].notnull() & pf[code_key[1]].notnull()]
+            y_data = [pos_data[k].tolist() for k in code_key]
             x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
     else:
         y_data = None
@@ -218,7 +217,7 @@ def tab_parser(filename, codes=False, key='fam', nb_aa=20):
     return x_data, y_data
 
 
-def SecS_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
+def secs_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
     """
         This module parses data from files containing sequence and secondary structure
         and transforms them to Evolutron format.
@@ -227,7 +226,7 @@ def SecS_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
     input_file = open(filename, "rU")
 
     aa_list = []
-    SecS_list = []
+    secs_list = []
     flag = True
     for record in SeqIO.parse(input_file, "fasta"):
         if flag:
@@ -237,15 +236,15 @@ def SecS_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
             flag = False
         else:
             sec = str(record.seq)
-            SecS_list.append(sec)
+            secs_list.append(sec)
 
             flag = True
 
     x_data = list(map(lambda x: aa2hot(x, nb_aa), aa_list))
     if nb_categories == 8:
-        y_data = list(map(SecS2hot_8cat, SecS_list))
+        y_data = list(map(SecS2hot_8cat, secs_list))
     elif nb_categories == 3:
-        y_data = list(map(SecS2hot_3cat, SecS_list))
+        y_data = list(map(SecS2hot_3cat, secs_list))
     else:
         raise TypeError('Number of categories should be 8 or 3')
 
@@ -266,7 +265,7 @@ def npz_parser(filename, nb_categories=8, pssm=False, codon_table=False,
     x_data = data[:, :, :nb_aa]
 
     if pssm:
-        x_data = np.concatenate((x_data, data[:, :, 35:35+nb_aa]), axis=-1)
+        x_data = np.concatenate((x_data, data[:, :, 35:35 + nb_aa]), axis=-1)
     if extra_features:
         x_data = np.concatenate((x_data, data[:, :, 31:33]), axis=-1)
     if codon_table:
@@ -278,108 +277,3 @@ def npz_parser(filename, nb_categories=8, pssm=False, codon_table=False,
     y_data = data[:, :, 22:30]
 
     return x_data, y_data
-
-
-class Handle(object):
-    """ Handles names for loading and saving different models.
-    """
-
-    def __init__(self,
-                 epochs=None,
-                 filters=None,
-                 filter_length=None,
-                 model=None,
-                 ftype=None,
-                 program=None,
-                 data_id=None,
-                 conv=None,
-                 fc=None,
-                 **kwargs):
-        self.epochs = epochs
-        self.filters = filters
-        self.filter_size = filter_length
-
-        self.model = model
-        self.ftype = ftype
-        self.program = program
-        self.dataset = data_id
-
-        self.n_convs = conv
-        self.n_fc = fc
-
-        self.filename = str(self).split('/')[-1]
-
-    def __str__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.dataset,
-                                                        self.filters,
-                                                        self.filter_size,
-                                                        self.epochs,
-                                                        self.n_convs,
-                                                        self.model,
-                                                        self.ftype,
-                                                        self.n_fc)
-
-    def __repr__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.dataset,
-                                                        self.filters,
-                                                        self.filter_size,
-                                                        self.epochs,
-                                                        self.n_convs,
-                                                        self.model,
-                                                        self.ftype,
-                                                        self.n_fc)
-
-    def __add__(self, other):
-        return str(self) + other
-
-    def __radd__(self, other):
-        return other + str(self)
-
-    @classmethod
-    def from_filename(cls, filename):
-        try:
-            basename, ftype, __ = filename.split('.')
-        except ValueError:
-            basename, ftype = filename.split('.')
-        dataset = basename.split('/')[-2]
-
-        info = basename.split('/')[-1]
-
-        filters, filter_size, epochs, conv, fc = map(eval, info.split('_')[:5])
-
-        model = info.split('_')[-1]
-
-        obj = cls(epochs=epochs, filters=filters, filter_length=filter_size, conv=conv, fc=fc,
-                  data_id=dataset, model=model, ftype=ftype)
-
-        return obj
-
-
-def fam(x):
-    dt = str(x).split(',')
-    f = [d for d in dt if d.find(' family') >= 0]
-
-    try:
-        return f[0]
-    except IndexError:
-        return "Unassigned"
-
-
-def supfam(x):
-    dt = str(x).split(',')
-    f = [d for d in dt if d.find('superfamily') >= 0]
-
-    try:
-        return f[0]
-    except IndexError:
-        return "Unassigned"
-
-
-def subfam(x):
-    dt = str(x).split(',')
-    f = [d for d in dt if d.find('subfamily') >= 0]
-
-    try:
-        return f[0]
-    except IndexError:
-        return "Unassigned"

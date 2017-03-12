@@ -64,7 +64,7 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
     elif filetype == 'fasta':
         x_data, y_data = io.fasta_parser(filename, **parser_options)
     elif filetype == 'sec':
-        x_data, y_data = io.SecS_parser(filename, **parser_options)
+        x_data, y_data = io.secs_parser(filename, **parser_options)
     elif filetype == 'gz':
         x_data, y_data = io.npz_parser(filename, **parser_options)
     else:
