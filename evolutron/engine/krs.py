@@ -259,7 +259,7 @@ class DeepTrainer:
                              verbose=verbose)
 
         except KeyboardInterrupt:
-            return
+            pass
 
         if return_best_model:
             self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))

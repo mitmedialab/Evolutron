@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from .seq_tools import aa_map, nt_map, aa2hot, SecS2hot_8cat, SecS2hot_3cat, aa2codon, hot2aa
+from .seq_tools import aa_map, nt_map, aa2hot, secs2hot, aa2codon, hot2aa
 from .utils import ZincFinger
 
 
@@ -241,12 +241,7 @@ def secs_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
             flag = True
 
     x_data = list(map(lambda x: aa2hot(x, nb_aa), aa_list))
-    if nb_categories == 8:
-        y_data = list(map(SecS2hot_8cat, secs_list))
-    elif nb_categories == 3:
-        y_data = list(map(SecS2hot_3cat, secs_list))
-    else:
-        raise TypeError('Number of categories should be 8 or 3')
+    y_data = list(map(lambda x: secs2hot(x, nb_categories), secs_list))
 
     return x_data, y_data
 

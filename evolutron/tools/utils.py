@@ -50,6 +50,7 @@ def count_lines(f):
 
 
 def nested_to_categorical(arr, classes=[]):
+    # TODO: write function docstring
     flat = []
     for a in arr:
         flat += a
