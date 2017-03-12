@@ -1,5 +1,5 @@
 """
-Evolutron is a deep learning tool suite for computational biology.
+Evolutron is a deep learning framework for the analysis of proteins.
 
 For more information, contact:
     karydis [at] mit.edu

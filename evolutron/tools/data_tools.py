@@ -90,24 +90,16 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
                 pass
 
     data_size = len(x_data)
+    print('Dataset size: {0}'.format(data_size))
 
-    # ToDo: The old format returns an error when y_data is an array. CHECK!
-    #if not y_data:
-    if y_data is None:
-        # Unsupervised Learning
-        # x_data: observations
-
-        print('Dataset size: {0}'.format(data_size))
-        return x_data
-    else:
-        # Supervised Learning
-        # x_data: observations
-        # y_data: class labels
+    # ToDo: Always returns x_data, y_data. Fix relevant code!
+    if y_data:
         try:
             assert ((len(x_data) == len(y_data)) or (len(x_data) == len(y_data[0])))
         except AssertionError:
             raise IOError('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data[0])))
 
         print('Dataset size: {0}'.format(data_size))
-        return x_data, np.asarray(y_data)
+        y_data = np.asarray(y_data)
 
+    return x_data, y_data

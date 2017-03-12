@@ -1,5 +1,4 @@
 # coding=utf-8
-
 import numpy as np
 
 """
@@ -143,7 +142,6 @@ aa2cod_map = {
     'O': [50],
 }
 
-
 """
 Transformations between representations
 """
@@ -176,16 +174,17 @@ def hot2aa(hot):
     return ''.join([aa_map_rev[n] for n in num])
 
 
-def SecS2hot_8cat(sec_seq):
-    num = [SecS_map_8cat[s] for s in sec_seq]
-    return np.eye(8, dtype=np.float32)[num]
+def secs2hot(sec_seq, cats=3):
+    if cats == 3:
+        num = [SecS_map_3cat[s] for s in sec_seq]
+    elif cats == 8:
+        num = [SecS_map_8cat[s] for s in sec_seq]
+    else:
+        raise ValueError('Invalid option for secondary structure . Should be 8 or 3.')
+    return np.eye(cats, dtype=np.float32)[num]
 
 
-def SecS2hot_3cat(sec_seq):
-    num = [SecS_map_3cat[s] for s in sec_seq]
-    return np.eye(3, dtype=np.float32)[num]
-
-
+# TODO: refactor this
 def hot2SecS_8cat(hot):
     num = [np.argmax(h) for h in hot]
 

@@ -27,9 +27,15 @@ def test_tab_parser():
 
     x_data, y_data = io.tab_parser('tests/test_tools/samples/sample.tsv', codes=False)
 
+    assert x_data, not y_data
+
     x_data, y_data = io.tab_parser('tests/test_tools/samples/sample.tsv', codes=True, code_key='fam')
 
+    assert x_data, y_data
+
     x_data, y_data = io.tab_parser('tests/test_tools/samples/sample.tsv', codes=False, nb_aa=22)
+
+    assert x_data, not y_data
 
     # Cleaning up
     os.remove('tests/test_tools/samples/sample.h5')
