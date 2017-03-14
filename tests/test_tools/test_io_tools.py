@@ -52,7 +52,10 @@ def test_tab_parser():
 def test_secs_parser():
     x_data, y_data = io.secs_parser('tests/test_tools/samples/smallSecS.sec')
 
-    assert x_data, y_data
+    assert type(x_data) == pd.Series
+    assert type(y_data) == list
+
+    os.remove('tests/test_tools/samples/smallSecS.h5')
 
 
 def test_npz_parser():
