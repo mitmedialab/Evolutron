@@ -5,7 +5,7 @@ from keras.models import Model, load_model, model_from_json
 from keras.objectives import categorical_crossentropy, mse
 from keras.regularizers import l2
 
-from ..extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Deconvolution1D
+from networks.krs.extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Deconvolution1D
 
 try:
     from metrics.krs.extra_metrics import mean_cat_acc
