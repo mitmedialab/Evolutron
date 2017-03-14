@@ -134,10 +134,10 @@ def fasta_parser(filename, codes=False, code_key=None, nb_aa=20):
         if codes:
             try:
                 # TODO: Remove this dependency in projects by specifying the correct code
-                if filename == 'datasets/scop2.fasta':
-                    code_key = 'scop'
-                else:
-                    code_key = 'type2p'
+                # if filename == 'datasets/scop2.fasta':
+                #     code_key = 'scop'
+                # else:
+                #     code_key = 'type2p'
 
                 if code_key == 'scop':
                     code_list.append(record.description.split('|')[-1])

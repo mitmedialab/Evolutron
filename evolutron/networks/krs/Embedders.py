@@ -1,19 +1,17 @@
-from keras.layers import Input, LSTM, Activation, Dropout, Masking, merge
-from ..extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, Convolution2D, \
-        AtrousConvolution1D, Deconvolution1D
-
+import keras.backend as K
+from keras.layers import Input, LSTM, Activation, Masking
+from keras.metrics import categorical_accuracy
 from keras.models import Model, load_model, model_from_json
 from keras.objectives import categorical_crossentropy, mse
-from keras.metrics import categorical_accuracy
 from keras.regularizers import l2
-import keras.backend as K
+
+from ..extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Deconvolution1D
 
 try:
-    from .extra_metrics import mean_cat_acc
+    from metrics.krs.extra_metrics import mean_cat_acc
 except Exception: #ImportError
     from extra_metrics import mean_cat_acc
 
-import numpy as np
 import sys, os, h5py
 
 try:
