@@ -5,6 +5,7 @@ import numpy as np
 Beta = 1
 
 
+
 def mean_cat_acc(y_true, y_pred):
     nb_categories = K.shape(y_true)[-1]
     y_true = K.reshape(y_true, shape=(-1, nb_categories))

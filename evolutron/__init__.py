@@ -5,7 +5,7 @@ For more information, contact:
     karydis [at] mit.edu
 """
 from __future__ import absolute_import
-from . import evaluations
+from . import metrics
 from . import motifs
 from . import networks
 from . import structural
