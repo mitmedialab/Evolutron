@@ -192,7 +192,7 @@ class DeepTrainer:
             raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
 
     def fit(self, x_data, y_data, nb_epoch=1, batch_size=64, shuffle=True, validate=.0, patience=10,
-            return_best_model=True, verbose=1, extra_callbacks=None, reduce_factor=.5):
+            return_best_model=True, verbose=1, extra_callbacks=None, reduce_factor=.5, nb_inputs=1, nb_outputs=1):
 
         # Check arguments
         if extra_callbacks is None:
@@ -205,15 +205,20 @@ class DeepTrainer:
         else:
             stratify = None
 
-        if len(x_data) == len(y_data):  # TODO: this is not a good condition, we have do find a better way than len
+        if nb_inputs == 1:
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+        else:
+            stratify = None
+            x_train = [[] for _ in x_data]
+            x_valid = [[] for _ in x_data]
+            for i, x_d in enumerate(x_data):
+                x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.input[i], validate, stratify)
+        if nb_outputs == 1:
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
             stratify = None
-            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
             y_train = [[] for _ in y_data]
             y_valid = [[] for _ in y_data]
-
             for i, y_d in enumerate(y_data):
                 y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
 

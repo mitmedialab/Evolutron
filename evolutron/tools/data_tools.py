@@ -1,7 +1,9 @@
 # coding=utf-8
 import numpy as np
 
-from evolutron.tools import io_tools as io
+from ..tools import io_tools as io
+from .seq_tools import aa2hot
+
 
 file_db = {
     'random': '/data/datasets/random_aa.fasta',
@@ -29,7 +31,8 @@ file_db = {
     'acetyl': '/data/datasets/sprot_ec2_3_pfam.tsv',
     'mycoplasma': '/data/datasets/uniprot_mycoplasma_pfam.tsv',
     'small_all': '/data/datasets/small_uniprot-all.tsv',
-    'go': '/data/datasets/sprot_go.tsv'
+    'go': '/data/datasets/sprot_go.tsv',
+    'ppi': '/data/datasets/ppi_seq.h5'
 }
 
 
@@ -50,7 +53,8 @@ def pad_or_clip_seq(x, n):
         return x[:n, :]
 
 
-def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=False, **parser_options):
+def load_dataset(data_id, one_hot='x', padded=True, nb_aa=20, min_aa=None, max_aa=None, pad_y_data=False,
+                 codes=None, code_key=None, **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
     try:
@@ -62,13 +66,35 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, pad_y_data=Fals
     if filetype == 'tsv':
         x_data, y_data = io.tab_parser(filename, **parser_options)
     elif filetype == 'fasta':
-        x_data, y_data = io.fasta_parser(filename, **parser_options)
+        x_data, y_data = io.fasta_parser(filename, codes, code_key)
     elif filetype == 'sec':
-        x_data, y_data = io.secs_parser(filename, **parser_options)
+        x_data, y_data = io.secs_parser(filename, nb_aa=nb_aa, **parser_options)
     elif filetype == 'gz':
-        x_data, y_data = io.npz_parser(filename, **parser_options)
+        x_data, y_data = io.npz_parser(filename, nb_aa=nb_aa, **parser_options)
     else:
         raise NotImplementedError('There is no parser for current file type.')
+
+    if 'x' in one_hot:
+        x_data = x_data.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+
+    if 'y' in one_hot:
+        pass
+        # if codes:
+        #     if type(code_key) == str:
+        #         pf = raw_data[code_key].astype('category')
+        #         raw_data['codes'] = pf.cat.codes
+        #         pos_data = raw_data[raw_data['codes'] > 0]
+        #         y_data = pos_data.codes.tolist()
+        #         y_data = [y + 1 for y in y_data]
+        #         x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+        #     else:
+        #         pf = raw_data[code_key]
+        #         pos_data = raw_data[pf[code_key[0]].notnull() & pf[code_key[1]].notnull()]
+        #         y_data = [pos_data[k].tolist() for k in code_key]
+        #         x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+        # else:
+        #     x_data = raw_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+        #     y_data = None
 
     if padded:
         if not max_aa:

@@ -2,25 +2,25 @@
 import functools
 import keras.backend as K
 import numpy as np
-from keras.layers import regularizers, initializations, activations, constraints
+from keras.layers import regularizers, activations, constraints, initializers
 from keras.activations import relu
 from keras.engine import InputSpec
-from keras.initializations import glorot_uniform
+from keras.initializers import glorot_uniform
 # from keras.layers.pooling import _Pooling1D
-from keras.layers.recurrent import Recurrent, time_distributed_dense
+from keras.layers.recurrent import Recurrent
 from keras.models import Layer
-from keras.utils.np_utils import conv_output_length
+from keras.utils.conv_utils import conv_output_length
 
 import keras.layers as native
 
 
-class Convolution1D(native.Convolution1D):
+class Convolution1D(native.Conv1D):
     def __init__(self, nb_filter, filter_length, **kwargs):
         self.supports_masking = True
         super(Convolution1D, self).__init__(nb_filter, filter_length, **kwargs)
 
 
-class Convolution2D(native.Convolution2D):
+class Convolution2D(native.Conv2D):
     def __init__(self, nb_filter, filter_length, **kwargs):
         self.supports_masking = True
         super(Convolution2D, self).__init__(nb_filter, filter_length, **kwargs)
@@ -50,10 +50,10 @@ class Reshape(native.Reshape):
         super(Reshape, self).__init__(target_shape, **kwargs)
 
 
-class AtrousConvolution1D(native.AtrousConvolution1D):
-    def __init__(self, target_shape, **kwargs):
-        self.supports_masking = True
-        super(AtrousConvolution1D, self).__init__(target_shape, **kwargs)
+# class AtrousConvolution1D(native):
+#     def __init__(self, target_shape, **kwargs):
+#         self.supports_masking = True
+#         super(AtrousConvolution1D, self).__init__(target_shape, **kwargs)
 
 
 class Deconvolution1D(Layer):
@@ -83,7 +83,7 @@ class Deconvolution1D(Layer):
             self.filter_length = filter_length
             self.border_mode = border_mode
 
-        self.init = initializations.get(init)
+        self.init = initializers.get(init)
         self.activation = activations.get(activation)
         self.subsample_length = subsample_length
 
@@ -185,7 +185,7 @@ class Dedense(Layer):
 
         self.supports_masking = True
 
-        self.init = initializations.get(init)
+        self.init = initializers.get(init)
         self.activation = activations.get(activation)
 
         if bound_dense_layer:
@@ -371,9 +371,9 @@ class FeedForwardLSTM(Recurrent):
                  W_regularizer=None, U_regularizer=None, b_regularizer=None,
                  dropout_W=0., dropout_U=0., **kwargs):
         self.output_dim = output_dim
-        self.init = initializations.get(init)
-        self.inner_init = initializations.get(inner_init)
-        self.forget_bias_init = initializations.get(forget_bias_init)
+        self.init = initializers.get(init)
+        self.inner_init = initializers.get(inner_init)
+        self.forget_bias_init = initializers.get(forget_bias_init)
         self.activation = activations.get(activation)
         self.inner_activation = activations.get(inner_activation)
         self.W_regularizer = regularizers.get(W_regularizer)

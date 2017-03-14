@@ -1,6 +1,6 @@
 # coding=utf-8
 
-from .krs.extra_layers import (Convolution1D, AtrousConvolution1D, Deconvolution1D, Convolution2D,
+from .krs.extra_layers import (Convolution1D, Deconvolution1D, Convolution2D, # AtrousConv1D
                                MaxPooling1D, Unpooling1D,
                                Dense, Dedense, Reshape, Flatten,
                                LocallyConnected1D,
@@ -17,5 +17,6 @@ custom_layers = {
     'Reshape': Reshape,
     'Flatten': Flatten,
     'LocallyConnected1D': LocallyConnected1D,
-    'FeedForwardLSTM': FeedForwardLSTM
+    'FeedForwardLSTM': FeedForwardLSTM,
+    # 'AtrousConv1D': AtrousConv1D
 }
