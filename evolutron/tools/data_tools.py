@@ -79,22 +79,6 @@ def load_dataset(data_id, one_hot='x', padded=True, nb_aa=20, min_aa=None, max_a
 
     if 'y' in one_hot:
         pass
-        # if codes:
-        #     if type(code_key) == str:
-        #         pf = raw_data[code_key].astype('category')
-        #         raw_data['codes'] = pf.cat.codes
-        #         pos_data = raw_data[raw_data['codes'] > 0]
-        #         y_data = pos_data.codes.tolist()
-        #         y_data = [y + 1 for y in y_data]
-        #         x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
-        #     else:
-        #         pf = raw_data[code_key]
-        #         pos_data = raw_data[pf[code_key[0]].notnull() & pf[code_key[1]].notnull()]
-        #         y_data = [pos_data[k].tolist() for k in code_key]
-        #         x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
-        # else:
-        #     x_data = raw_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
-        #     y_data = None
 
     if padded:
         if not max_aa:

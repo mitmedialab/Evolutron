@@ -240,7 +240,12 @@ def secs_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
 
             flag = True
 
-    x_data = list(map(lambda x: aa2hot(x, nb_aa), aa_list))
+    raw_data = pd.DataFrame()
+    raw_data['sequence'] = pd.Series(aa_list)
+    raw_data['secs'] = pd.Series(secs_list)
+
+    x_data = raw_data.sequence
+
     y_data = list(map(lambda x: secs2hot(x, nb_categories), secs_list))
 
     return x_data, y_data
