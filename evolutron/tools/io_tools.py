@@ -121,7 +121,7 @@ def type2p_code(description):
     return code.flatten()
 
 
-def fasta_parser(filename, codes=False, code_key=None, nb_aa=20):
+def fasta_parser(filename, codes=False, code_key=None):
     """
         This module parses data from FASTA files and transforms them to Evolutron format.
     """
@@ -133,20 +133,19 @@ def fasta_parser(filename, codes=False, code_key=None, nb_aa=20):
         aa_list.append(str(record.seq))
         if codes:
             try:
-                # TODO: Remove this dependency in projects by specifying the correct code
-                # if filename == 'datasets/scop2.fasta':
-                #     code_key = 'scop'
-                # else:
-                #     code_key = 'type2p'
-
                 if code_key == 'scop':
                     code_list.append(record.description.split('|')[-1])
                 elif code_key == 'type2p':
                     code_list.append(type2p_code(record.description))
+                else:
+                    raise IOError('You had codes=True but did not provide a code_key')
             except:
                 raise IOError('Fasta parser code option set to True, but code was not recognized')
 
-    x_data = list(map(lambda x: aa2hot(x, nb_aa), aa_list))
+    raw_data = pd.DataFrame()
+    raw_data['sequence'] = pd.Series(aa_list)
+
+    x_data = raw_data.sequence
 
     if codes:
         y_data = code_list
@@ -156,7 +155,7 @@ def fasta_parser(filename, codes=False, code_key=None, nb_aa=20):
     return x_data, y_data
 
 
-def tab_parser(filename, codes=False, code_key=None, nb_aa=20):
+def tab_parser(filename, codes=False, code_key=None):
     def fam(x):
         dt = str(x).split(',')
         f = [d for d in dt if d.find(' family') >= 0]
@@ -189,13 +188,14 @@ def tab_parser(filename, codes=False, code_key=None, nb_aa=20):
     except FileNotFoundError:
         raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
         raw_data.columns = raw_data.columns.str.strip().str.lower().str.replace(' ', '_')
-        raw_data['fam'] = raw_data['protein_families'].apply(fam)
-        raw_data['sup'] = raw_data['protein_families'].apply(supfam)
-        raw_data['sub'] = raw_data['protein_families'].apply(subfam)
+        try:
+            raw_data['fam'] = raw_data['protein_families'].apply(fam)
+            raw_data['sup'] = raw_data['protein_families'].apply(supfam)
+            raw_data['sub'] = raw_data['protein_families'].apply(subfam)
+        except KeyError:
+            pass
 
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
-
-    x_data = raw_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
 
     if codes:
         if type(code_key) == str:
@@ -204,14 +204,14 @@ def tab_parser(filename, codes=False, code_key=None, nb_aa=20):
             pos_data = raw_data[raw_data['codes'] > 0]
             y_data = pos_data.codes.tolist()
             y_data = [y + 1 for y in y_data]
-            x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+            x_data = pos_data.sequence
         else:
-            # ToDO: I changed this part to return the unprocessed labels (the goal is to support multiclasses) example ?
             pf = raw_data[code_key]
             pos_data = raw_data[pf[code_key[0]].notnull() & pf[code_key[1]].notnull()]
             y_data = [pos_data[k].tolist() for k in code_key]
-            x_data = pos_data.sequence.apply(lambda x: aa2hot(x, nb_aa)).tolist()
+            x_data = pos_data.sequence
     else:
+        x_data = raw_data.sequence
         y_data = None
 
     return x_data, y_data
