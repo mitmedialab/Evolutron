@@ -5,7 +5,6 @@ import numpy as np
 Beta = 1
 
 
-
 def mean_cat_acc(y_true, y_pred):
     nb_categories = K.shape(y_true)[-1]
     y_true = K.reshape(y_true, shape=(-1, nb_categories))
@@ -15,13 +14,13 @@ def mean_cat_acc(y_true, y_pred):
     is_real = K.sum(y_true, -1)
     # y_true = K.concatenate([y_true, K.epsilon() * K.max(K.ones_like(y_true), -1, keepdims=True)])
     s = K.sum(K.cast(K.equal(K.argmax(y_true, axis=-1), K.argmax(y_pred, axis=-1)), 'float32') * is_real)
-    return s/real_len
+    return s / real_len
 
 
 def multiclass_acc(y_true, y_pred):
     y_pred = K.round(y_pred)
 
-    return K.sum(K.equal(y_true, y_pred))/K.prod(K.shape(y_true))
+    return K.sum(K.equal(y_true, y_pred)) / K.prod(K.shape(y_true))
 
 
 def multiclass_precision(y_true, y_pred):
@@ -131,7 +130,8 @@ def multiclass_fmeasure(y_true, y_pred):
         predicted_positives = K.sum(K.equal(pred_max, ten))
         true_elements = K.sum(K.equal(true_max, ten))
 
-        fmeasure_dict['f_%d' % i] = ((Beta**2 + 1) * true_positives) / (Beta**2 * true_elements + predicted_positives)
+        fmeasure_dict['f_%d' % i] = ((Beta ** 2 + 1) * true_positives) / (
+            Beta ** 2 * true_elements + predicted_positives)
 
     return fmeasure_dict
 
@@ -141,7 +141,7 @@ def macro_fmeasure(y_true, y_pred):
     precision_value = macro_precision(y_true, y_pred)
     recall_value = macro_recall(y_true, y_pred)
 
-    return ((Beta**2 + 1) * precision_value * recall_value) / (Beta**2 * precision_value + recall_value)
+    return ((Beta ** 2 + 1) * precision_value * recall_value) / (Beta ** 2 * precision_value + recall_value)
 
 
 def micro_fmeasure(y_true, y_pred):
@@ -149,4 +149,4 @@ def micro_fmeasure(y_true, y_pred):
     precision_value = micro_precision(y_true, y_pred)
     recall_value = micro_recall(y_true, y_pred)
 
-    return ((Beta**2 + 1) * precision_value * recall_value) / (Beta**2 * precision_value + recall_value)
+    return ((Beta ** 2 + 1) * precision_value * recall_value) / (Beta ** 2 * precision_value + recall_value)

@@ -53,8 +53,16 @@ def pad_or_clip_seq(x, n):
         return x[:n, :]
 
 
-def load_dataset(data_id, one_hot='x', padded=True, nb_aa=20, min_aa=None, max_aa=None, pad_y_data=False,
-                 codes=None, code_key=None, **parser_options):
+def load_dataset(data_id,
+                 one_hot='x',
+                 padded=True,
+                 pad_y_data=False,
+                 nb_aa=20,
+                 min_aa=None,
+                 max_aa=None,
+                 codes=None,
+                 code_key=None,
+                 **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
     try:
@@ -64,7 +72,7 @@ def load_dataset(data_id, one_hot='x', padded=True, nb_aa=20, min_aa=None, max_a
         raise IOError('Dataset id not in file database.')
 
     if filetype == 'tsv':
-        x_data, y_data = io.tab_parser(filename, **parser_options)
+        x_data, y_data = io.tab_parser(filename, codes, code_key)
     elif filetype == 'fasta':
         x_data, y_data = io.fasta_parser(filename, codes, code_key)
     elif filetype == 'sec':
@@ -102,14 +110,12 @@ def load_dataset(data_id, one_hot='x', padded=True, nb_aa=20, min_aa=None, max_a
     data_size = len(x_data)
     print('Dataset size: {0}'.format(data_size))
 
-    # ToDo: Always returns x_data, y_data. Fix relevant code!
     if y_data:
         try:
             assert ((len(x_data) == len(y_data)) or (len(x_data) == len(y_data[0])))
         except AssertionError:
             raise IOError('Unequal lengths for X ({0}) and y ({1})'.format(len(x_data), len(y_data[0])))
 
-        print('Dataset size: {0}'.format(data_size))
         y_data = np.asarray(y_data)
 
     return x_data, y_data

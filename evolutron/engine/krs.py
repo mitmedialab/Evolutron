@@ -13,6 +13,7 @@ import keras.backend as K
 import keras.optimizers as opt
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
+from keras.utils import plot_model
 
 try:
     from theano.compile.nanguardmode import NanGuardMode
@@ -191,14 +192,24 @@ class DeepTrainer:
         else:
             raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
 
-    def fit(self, x_data, y_data, nb_epoch=1, batch_size=64, shuffle=True, validate=.0, patience=10,
-            return_best_model=True, verbose=1, extra_callbacks=None, reduce_factor=.5, nb_inputs=1, nb_outputs=1):
+    def fit(self, x_data, y_data,
+            nb_inputs=1,
+            nb_outputs=1,
+            epochs=1,
+            batch_size=64,
+            shuffle=True,
+            validate=.2,
+            patience=10,
+            return_best_model=True,
+            verbose=1,
+            extra_callbacks=None,
+            reduce_factor=.5):
 
         # Check arguments
         if extra_callbacks is None:
             extra_callbacks = []
         assert (validate >= 0)
-        assert nb_epoch > 0
+        assert epochs > 0
 
         if self.classification:
             stratify = y_data  # TODO: here you should select with which part to stratify
@@ -222,23 +233,6 @@ class DeepTrainer:
             for i, y_d in enumerate(y_data):
                 y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
 
-        # if self.classification:
-        #     msg = 'Distribution of Examples per set'
-        #     print(msg)
-        #     print('-' * len(msg))
-        #     classes = ['Class ' + str(i) for i in range(len(np.unique(y_data)))]
-        #     counts = dict()
-        #     _, c = np.unique(y_train, return_counts=True)
-        #     counts['train'] = c
-        #     _, c = np.unique(y_valid, return_counts=True)
-        #     counts['valid'] = c
-        #
-        #     print(tabulate([['Set'] + classes + ['Total'],
-        #                     ['Train'] + counts['train'].tolist() + [counts['train'].sum()],
-        #                     ['Valid'] + counts['valid'].tolist() + [counts['valid'].sum()]],
-        #                    stralign='center',
-        #                    headers="firstrow"))
-
         # Callbacks
         es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
         reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
@@ -258,7 +252,7 @@ class DeepTrainer:
             self.network.fit(x_train, y_train,
                              validation_data=(x_valid, y_valid),
                              shuffle=shuffle,
-                             nb_epoch=nb_epoch,
+                             epochs=epochs,
                              batch_size=batch_size,
                              callbacks=callbacks + extra_callbacks,
                              verbose=verbose)
