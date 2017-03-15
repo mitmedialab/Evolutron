@@ -6,12 +6,10 @@ from keras.layers import regularizers, activations, constraints, initializers
 from keras.activations import relu
 from keras.engine import InputSpec
 from keras.initializers import glorot_uniform
-# from keras.layers.pooling import _Pooling1D
 from keras.layers.recurrent import Recurrent
-from keras.models import Layer
-from keras.utils.conv_utils import conv_output_length
 
 import keras.layers as native
+from keras.layers.convolutional import _Conv
 
 
 class Convolution1D(native.Conv1D):
@@ -20,22 +18,28 @@ class Convolution1D(native.Conv1D):
         super(Convolution1D, self).__init__(nb_filter, filter_length, **kwargs)
 
 
+class LocallyConnected1D(native.LocallyConnected1D):
+    def __init__(self, **kwargs):
+        self.supports_masking = True
+        super(LocallyConnected1D, self).__init__(**kwargs)
+
+
 class Convolution2D(native.Conv2D):
     def __init__(self, nb_filter, filter_length, **kwargs):
         self.supports_masking = True
         super(Convolution2D, self).__init__(nb_filter, filter_length, **kwargs)
 
 
-class Dense(native.Dense):
-    def __init__(self, output_dim, **kwargs):
-        self.supports_masking = True
-        super(Dense, self).__init__(output_dim, **kwargs)
-
-
 class MaxPooling1D(native.MaxPooling1D):
     def __init__(self, **kwargs):
         self.supports_masking = True
         super(MaxPooling1D, self).__init__(**kwargs)
+
+
+class Upsampling1D(native.UpSampling1D):
+    def __init__(self, size, **kwargs):
+        self.supports_masking = True
+        super(Upsampling1D, self).__init__(size, **kwargs)
 
 
 class Flatten(native.Flatten):
@@ -50,283 +54,150 @@ class Reshape(native.Reshape):
         super(Reshape, self).__init__(target_shape, **kwargs)
 
 
-# class AtrousConvolution1D(native):
-#     def __init__(self, target_shape, **kwargs):
-#         self.supports_masking = True
-#         super(AtrousConvolution1D, self).__init__(target_shape, **kwargs)
-
-
-class Deconvolution1D(Layer):
-    def __init__(self, bound_conv_layer=None, nb_filter=None, filter_length=None, apply_mask=False,
-                 init='uniform', activation='linear', weights=None, subsample_length=1,
-                 W_regularizer=None, b_regularizer=None, activity_regularizer=None,
-                 W_constraint=None, b_constraint=None, border_mode='valid',
-                 bias=True, input_dim=None, input_length=None, **kwargs):
+class Deconvolution1D(_Conv):
+    def __init__(self, bound_conv_layer,
+                 apply_mask=False,
+                 strides=1,
+                 dilation_rate=1,
+                 activation=None,
+                 use_bias=True,
+                 kernel_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 kernel_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 kernel_constraint=None,
+                 bias_constraint=None,
+                 **kwargs):
 
         self.supports_masking = True
         self.apply_mask = apply_mask
 
-        if 'border_mode' in kwargs:
-            raise Exception('Border mode is inferred from Conv Layer')
+        self._bound_conv_layer = bound_conv_layer
+        try:
+            nb_filter = self._bound_conv_layer.input_shape[2]
+        except ValueError:
+            nb_filter = 'Not sure yet, input shape of convolutional layer not provided during construction.'
+        filter_length = self._bound_conv_layer.kernel_size
+        padding = self._bound_conv_layer.padding
 
-        if bound_conv_layer:  # If instanciated through a connection
-            self._bound_conv_layer = bound_conv_layer
-            try:
-                self.nb_filter = self._bound_conv_layer.input_shape[2]
-            except ValueError:
-                self.nb_filter = 'Not sure yet, input shape of convolutional layer not provided during construction.'
-            self.filter_length = self._bound_conv_layer.filter_length
-            self.border_mode = self._bound_conv_layer.border_mode
-        else:
-            # if instanciated through config
-            self.nb_filter = nb_filter
-            self.filter_length = filter_length
-            self.border_mode = border_mode
-
-        self.init = initializers.get(init)
-        self.activation = activations.get(activation)
-        self.subsample_length = subsample_length
-
-        self.subsample = (subsample_length, 1)
-
-        self.W_regularizer = regularizers.get(W_regularizer)
-        self.b_regularizer = regularizers.get(b_regularizer)
-        self.activity_regularizer = regularizers.get(activity_regularizer)
-
-        self.W_constraint = constraints.get(W_constraint)
-        self.b_constraint = constraints.get(b_constraint)
-
-        self.bias = bias
-        self.input_spec = [InputSpec(ndim=3)]
-        self.initial_weights = weights
-        self.input_dim = input_dim
-        self.input_length = input_length
-        if self.input_dim:
-            kwargs['input_shape'] = (self.input_length, self.input_dim)
-        super(Deconvolution1D, self).__init__(**kwargs)
+        super(Deconvolution1D, self).__init__(rank=1,
+                                              filters=nb_filter,
+                                              kernel_size=filter_length,
+                                              strides=strides,
+                                              padding=padding,
+                                              data_format='channels_last',
+                                              dilation_rate=dilation_rate,
+                                              activation=activation,
+                                              use_bias=use_bias,
+                                              kernel_initializer=kernel_initializer,
+                                              bias_initializer=bias_initializer,
+                                              kernel_regularizer=kernel_regularizer,
+                                              bias_regularizer=bias_regularizer,
+                                              activity_regularizer=activity_regularizer,
+                                              kernel_constraint=kernel_constraint,
+                                              bias_constraint=bias_constraint,
+                                              **kwargs)
+        self.input_spec = InputSpec(ndim=3)
 
     def build(self, input_shape):
-        input_dim = input_shape[2]
-
-        if hasattr(self, '_bound_conv_layer'):
-            self.nb_filter = self._bound_conv_layer.input_shape[2]
-            self.W_shape = (self.filter_length, 1, input_dim, self.nb_filter)
-            self.W = K.permute_dimensions(self._bound_conv_layer.W, (0, 1, 3, 2))
+        if self.data_format == 'channels_first':
+            channel_axis = 1
         else:
-            self.W_shape = (self.filter_length, 1, input_dim, self.nb_filter)
-            self.W = self.add_weight(self.W_shape,
-                                     initializer=functools.partial(self.init, dim_ordering='th'),
-                                     name='{}_W'.format(self.name),
-                                     regularizer=self.W_regularizer,
-                                     constraint=self.W_constraint)
+            channel_axis = -1
+        if input_shape[channel_axis] is None:
+            raise ValueError('The channel dimension of the inputs '
+                             'should be defined. Found `None`.')
+        input_dim = input_shape[channel_axis]
 
-        if self.bias:
-            self.b = self.add_weight((self.nb_filter,),
-                                     initializer='zero',
-                                     name='{}_b'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
+        self.filters = self._bound_conv_layer.input_shape[2]
+        self.kernel = K.permute_dimensions(self._bound_conv_layer.kernel, (0, 2, 1))
+
+        if self.use_bias:
+            self.bias = self.add_weight((self.filters,),
+                                        initializer=self.bias_initializer,
+                                        name='bias',
+                                        regularizer=self.bias_regularizer,
+                                        constraint=self.bias_constraint)
         else:
-            self.b = None
-
-        if self.initial_weights is not None:
-            self.set_weights(self.initial_weights)
-            del self.initial_weights
-
+            self.bias = None
+        # Set input spec.
+        self.input_spec = InputSpec(ndim=self.rank + 2,
+                                    axes={channel_axis: input_dim})
         self.built = True
 
-    def get_output_shape_for(self, input_shape):
-        length = conv_output_length(input_shape[1],
-                                    self.filter_length,
-                                    self.border_mode,
-                                    self.subsample[0])
-        return input_shape[0], length, self.nb_filter
+    def call(self, inputs, mask=None):
 
-    def call(self, x, mask=None):
-        x = K.expand_dims(x, 2)  # add a dummy dimension
-        output = K.conv2d(x, self.W, strides=self.subsample,
-                          border_mode=self.border_mode,
-                          dim_ordering='tf')
-        output = K.squeeze(output, 2)  # remove the dummy dimension
+        outputs = K.conv1d(inputs,
+                           self.kernel,
+                           strides=self.strides[0],
+                           padding=self.padding,
+                           data_format=self.data_format,
+                           dilation_rate=self.dilation_rate[0])
         if self.bias:
-            output += K.reshape(self.b, (1, 1, self.nb_filter))
+            outputs = K.bias_add(
+                outputs,
+                self.bias,
+                data_format=self.data_format)
 
-        output = self.activation(output)
+        if self.activation is not None:
+            outputs = self.activation(outputs)
+
         # To do in the last only
         if self.apply_mask:
-            output = output * K.cast(mask, K.floatx())
-        return output
-
-    def get_config(self):
-        config = {'nb_filter': self.nb_filter,
-                  'filter_length': self.filter_length,
-                  'init': self.init.__name__,
-                  'activation': self.activation.__name__,
-                  'border_mode': self.border_mode,
-                  'subsample_length': self.subsample_length,
-                  'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
-                  'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
-                  'activity_regularizer': self.activity_regularizer.get_config() if self.activity_regularizer else None,
-                  'W_constraint': self.W_constraint.get_config() if self.W_constraint else None,
-                  'b_constraint': self.b_constraint.get_config() if self.b_constraint else None,
-                  'bias': self.bias,
-                  'input_dim': self.input_dim,
-                  'input_length': self.input_length}
-        base_config = super(Deconvolution1D, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+            outputs = outputs * K.cast(mask, K.floatx())
+        return outputs
 
 
-class Dedense(Layer):
-    def __init__(self, bound_dense_layer=None, output_dim=None, init='glorot_uniform',
-                 activation='linear', weights=None,
-                 W_regularizer=None, b_regularizer=None, activity_regularizer=None,
-                 W_constraint=None, b_constraint=None,
-                 bias=True, input_dim=None, **kwargs):
+class Dedense(native.Dense):
+    def __init__(self, bound_dense_layer,
+                 activation=None,
+                 use_bias=True,
+                 kernel_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 kernel_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 kernel_constraint=None,
+                 bias_constraint=None,
+                 **kwargs):
 
-        self.supports_masking = True
+        self._bound_dense_layer = bound_dense_layer
 
-        self.init = initializers.get(init)
-        self.activation = activations.get(activation)
+        try:
+            units = self._bound_dense_layer.input_shape[0]
+        except Exception:
+            units = 'Not sure yet, input shape of dense layer not provided during construction.'
 
-        if bound_dense_layer:
-            self._bound_dense_layer = bound_dense_layer
-
-            try:
-                self.output_dim = self._bound_dense_layer.input_shape[0]
-            except Exception:
-                self.output_dim = 'Not sure yet, input shape of dense layer not provided during construction.'
-        else:
-            self.output_dim = output_dim
-
-        self.input_dim = input_dim
-
-        self.W_regularizer = regularizers.get(W_regularizer)
-        self.b_regularizer = regularizers.get(b_regularizer)
-        self.activity_regularizer = regularizers.get(activity_regularizer)
-
-        self.W_constraint = constraints.get(W_constraint)
-        self.b_constraint = constraints.get(b_constraint)
-
-        self.bias = bias
-        self.initial_weights = weights
-        self.input_spec = [InputSpec(ndim='2+')]
-
-        if self.input_dim:
-            kwargs['input_shape'] = (self.input_dim,)
-        super(Dedense, self).__init__(**kwargs)
+        super(Dedense, self).__init__(units,
+                                      activation=activation,
+                                      use_bias=use_bias,
+                                      kernel_initializer=kernel_initializer,
+                                      bias_initializer=bias_initializer,
+                                      kernel_regularizer=kernel_regularizer,
+                                      bias_regularizer=bias_regularizer,
+                                      activity_regularizer=activity_regularizer,
+                                      kernel_constraint=kernel_constraint,
+                                      bias_constraint=bias_constraint,
+                                      **kwargs)
 
     def build(self, input_shape):
-        assert len(input_shape) == 2
-        input_dim = input_shape[1]
-        self.input_dim = input_dim
-        self.input_spec = [InputSpec(dtype=K.floatx(),
-                                     shape=(None, input_dim))]
+        assert len(input_shape) >= 2
+        input_dim = input_shape[-1]
 
-        if hasattr(self, '_bound_dense_layer'):
-            self.output_dim = self._bound_dense_layer.input_shape[1]
-            self.W = K.transpose(self._bound_dense_layer.W)
+        self.units = self._bound_dense_layer.input_shape[1]
+        self.kernel = K.transpose(self._bound_dense_layer.kernel)
+
+        if self.use_bias:
+            self.bias = self.add_weight((self.units,),
+                                        initializer=self.bias_initializer,
+                                        name='bias',
+                                        regularizer=self.bias_regularizer,
+                                        constraint=self.bias_constraint)
         else:
-            self.W = self.add_weight((input_dim, self.output_dim),
-                                     initializer=self.init,
-                                     name='{}_W'.format(self.name),
-                                     regularizer=self.W_regularizer,
-                                     constraint=self.W_constraint)
-
-        if self.bias:
-            self.b = self.add_weight((self.output_dim,),
-                                     initializer='zero',
-                                     name='{}_b'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
-        else:
-            self.b = None
-
-        if self.initial_weights is not None:
-            self.set_weights(self.initial_weights)
-            del self.initial_weights
+            self.bias = None
+        self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim})
         self.built = True
-
-    def call(self, x, mask=None):
-        output = K.dot(x, self.W)
-        if self.bias:
-            output += self.b
-        return self.activation(output)
-
-    def get_output_shape_for(self, input_shape):
-        assert input_shape and len(input_shape) == 2
-        return (input_shape[0], self.output_dim)
-
-    def get_config(self):
-        config = {'output_dim': self.output_dim,
-                  'init': self.init.__name__,
-                  'activation': self.activation.__name__,
-                  'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
-                  'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
-                  'activity_regularizer': self.activity_regularizer.get_config() if self.activity_regularizer else None,
-                  'W_constraint': self.W_constraint.get_config() if self.W_constraint else None,
-                  'b_constraint': self.b_constraint.get_config() if self.b_constraint else None,
-                  'bias': self.bias,
-                  'input_dim': self.input_dim}
-        base_config = super(Dedense, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
-
-
-class Unpooling1D(Layer):
-    """Repeat each temporal step `length` times along the time axis.
-
-    # Arguments
-        length: integer. Upsampling factor.
-
-    # Input shape
-        3D tensor with shape: `(samples, steps, features)`.
-
-    # Output shape
-        3D tensor with shape: `(samples, upsampled_steps, features)`.
-    """
-
-    def __init__(self, bound_pool_layer=None, length=None, **kwargs):
-
-        self.supports_masking = True
-
-        if bound_pool_layer:
-            self._bound_pool_layer = bound_pool_layer
-            try:
-                self.length = self._bound_pool_layer.input_shape[1]
-            except Exception:
-                self.length = 'Not sure yet, input shape not provided during construction.'
-        else:
-            self.length = length
-
-        self.input_spec = [InputSpec(ndim=3)]
-        super(Unpooling1D, self).__init__(**kwargs)
-
-    def get_output_shape_for(self, input_shape):
-        length = self.length * input_shape[1] if input_shape[1] and self.length is not None else None
-        return (input_shape[0], length, input_shape[2])
-
-    def call(self, x, mask=None):
-
-        if hasattr(self, '_bound_pool_layer'):
-            self.length = self._bound_pool_layer.input_shape[1]
-
-        pre_output = K.repeat_elements(x, self.length, axis=1)
-
-        if hasattr(self,
-                   '_bound_pool_layer') and K.backend() == 'theano':  # if we have theano backend, we get nice upsample
-            # TODO: implement this when loading
-            import theano.tensor as T
-            output = T.grad(K.sum(self._bound_pool_layer.output), wrt=self._bound_pool_layer.input) * pre_output
-
-        else:
-            # TODO: implement unpooling in tensorflow
-            output = pre_output
-
-        return output
-
-    def get_config(self):
-        config = {'length': self.length}
-        base_config = super(Unpooling1D, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
 
 
 class FeedForwardLSTM(Recurrent):
@@ -606,7 +477,3 @@ class FeedForwardLSTM(Recurrent):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-class LocallyConnected1D(native.LocallyConnected1D):
-    def __init__(self, **kwargs):
-        self.supports_masking = True
-        super(LocallyConnected1D, self).__init__(**kwargs)
