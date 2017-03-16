@@ -12,13 +12,11 @@ from tabulate import tabulate
 import keras.backend as K
 import keras.optimizers as opt
 from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
-from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
-from keras.utils import plot_model
+from sklearn.model_selection import train_test_split
 
-try:
+if K.backend() == 'theano':
     from theano.compile.nanguardmode import NanGuardMode
-except ImportError:
-    pass
+    from theano.compile.monitormode import MonitorMode
 
 
 class DeepTrainer:
@@ -96,16 +94,13 @@ class DeepTrainer:
 
         self._funcs_init = True
 
-    """def fit_generator(self):
-        # TODO: if dataset is big
-        # fit_generator(self, generator, samples_per_epoch, nb_epoch, verbose=1, callbacks=[], validation_data=None,
-        # nb_val_samples=None, class_weight={}, max_q_size=10, nb_worker=1, pickle_safe=False)
-        raise NotImplementedError"""
     def fit_generator(self, x_data, y_data, generator, nb_classes, nb_epoch=1, batch_size=64, shuffle=True,
                       validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                      reduce_factor=.5, classes=[]):
+                      reduce_factor=.5, classes=None):
 
         # Check arguments
+        if classes is None:
+            classes = []
         if extra_callbacks is None:
             extra_callbacks = []
         assert (validate >= 0)
@@ -132,12 +127,23 @@ class DeepTrainer:
                 y_train[i], y_valid[i] = self._check_and_split_data(y_d, x_data, validate, stratify)
 
         # Callbacks
-        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
-                                      patience=patience / 2, min_lr=0.001, verbose=1)
+        es = EarlyStopping(monitor='val_loss',
+                           min_delta=0.0001,
+                           patience=patience,
+                           verbose=1,
+                           mode='min')
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss',
+                                      factor=reduce_factor,
+                                      patience=5,
+                                      min_lr=0.001,
+                                      verbose=1)
         rn = np.random.random()
-        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
-                                     save_best_only=True, save_weights_only=True)
+        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
+                                     monitor='val_loss',
+                                     verbose=1,
+                                     mode='min',
+                                     save_best_only=True,
+                                     save_weights_only=True)
 
         if K.backend() == "tensorflow":
             tb = TensorBoard()
@@ -234,18 +240,28 @@ class DeepTrainer:
                 y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
 
         # Callbacks
-        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
-                                      patience=patience / 2, min_lr=0.001, verbose=1)
+        es = EarlyStopping(monitor='val_loss',
+                           min_delta=0.0001,
+                           patience=patience,
+                           verbose=1,
+                           mode='min')
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss',
+                                      factor=reduce_factor,
+                                      patience=5,
+                                      min_lr=0.001,
+                                      verbose=1)
         rn = np.random.random()
-        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
-                                     save_best_only=True, save_weights_only=True)
+        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
+                                     monitor='val_loss',
+                                     verbose=1,
+                                     mode='min',
+                                     save_best_only=True,
+                                     save_weights_only=True)
 
+        callbacks = [es, reduce_lr, checkpoint]
         if K.backend() == "tensorflow":
             tb = TensorBoard()
-            callbacks = [es, reduce_lr, checkpoint, tb]
-        else:
-            callbacks = [es, reduce_lr, checkpoint]
+            callbacks.append(tb)
 
         start_time = time.time()
         try:
@@ -256,18 +272,19 @@ class DeepTrainer:
                              batch_size=batch_size,
                              callbacks=callbacks + extra_callbacks,
                              verbose=verbose)
-
         except KeyboardInterrupt:
             pass
 
         if return_best_model:
-            self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+            try:
+                self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+            except:
+                print('Unable to load best parameters, saving current model.')
 
         self.history = self.network.history
 
-        print(
-            'Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-                                                                        time.time() - start_time))
+        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
+                                                                          time.time() - start_time))
 
         return x_valid, y_valid
 
