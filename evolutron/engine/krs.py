@@ -94,11 +94,13 @@ class DeepTrainer:
 
         self._funcs_init = True
 
-    def fit_generator(self, x_data, y_data, generator, nb_epoch=1, batch_size=64, shuffle=True,
+    def fit_generator(self, x_data, y_data, generator, nb_classes, nb_epoch=1, batch_size=64, shuffle=True,
                       validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                      reduce_factor=.5, nb_inputs=1, nb_outputs=1, **generator_options):
+                      reduce_factor=.5, classes=None):
 
         # Check arguments
+        if classes is None:
+            classes = []
         if extra_callbacks is None:
             extra_callbacks = []
         assert (validate >= 0)
@@ -109,23 +111,21 @@ class DeepTrainer:
         else:
             stratify = None
 
-        if nb_inputs == 1:
+        if len(x_data) == len(y_data):  # TODO: this is not a good condition, we have do find a better way than len
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
-        else:
-            stratify = None
-            x_train = [[] for _ in x_data]
-            x_valid = [[] for _ in x_data]
-            for i, x_d in enumerate(x_data):
-                x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.network.inputs[i],
-                                                                    validate, stratify)
-        if nb_outputs == 1:
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
+            uni = np.unique(y_data[0], return_index=True, return_counts=True)
             stratify = None
+            """for i, v in enumerate(uni[2]):
+                if v < 2:
+                    stratify[uni[1][i]] = 0"""
+            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
             y_train = [[] for _ in y_data]
             y_valid = [[] for _ in y_data]
             for i, y_d in enumerate(y_data):
-                y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
+                y_train[i], y_valid[i] = self._check_and_split_data(y_d, x_data, validate, stratify)
+
         # Callbacks
         es = EarlyStopping(monitor='val_loss',
                            min_delta=0.0001,
@@ -151,82 +151,18 @@ class DeepTrainer:
         else:
             callbacks = [es, reduce_lr, checkpoint]
 
-        if nb_inputs == 1:
-            nb_train_samples = len(x_train)
-            nb_val_samples = len(x_valid)
-        else:
-            nb_train_samples = len(x_train[0])
-            nb_val_samples = len(x_valid[0])
-
         start_time = time.time()
         try:
+            print(len(y_train), len(y_train[0]))
             self.network.fit_generator(generator=generator((x_train, y_train), batch_size=batch_size,
-                                                           shuffle=shuffle, **generator_options),
-                                       steps_per_epoch=np.ceil(nb_train_samples / batch_size),
-                                       # samples_per_epoch=len(x_train),
-                                       epochs=nb_epoch,
+                                                           shuffle=shuffle, classes=classes),
+                                       samples_per_epoch=len(x_train),
+                                       nb_epoch=nb_epoch,
                                        verbose=verbose,
                                        callbacks=callbacks + extra_callbacks,
-                                       validation_data=generator((x_valid, y_valid), batch_size=batch_size,
-                                                                 **generator_options),
-                                       validation_steps=np.ceil(nb_val_samples / batch_size))
-
-        except KeyboardInterrupt:
-            return
-
-        if return_best_model:
-            self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
-
-        self.history = self.network.history
-
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-                                                                          time.time() - start_time))
-
-        return x_valid, y_valid
-
-
-    def fit_generator_from_file(self, file, generator, nb_samples, nb_epoch=1, batch_size=64, shuffle=True,
-                                validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                                reduce_factor=.5, **generator_options):
-
-        # Check arguments
-        if extra_callbacks is None:
-            extra_callbacks = []
-        assert (validate >= 0)
-        assert nb_epoch > 0
-
-        # Callbacks
-        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
-                                      patience=patience / 2, min_lr=0.001, verbose=1)
-        rn = np.random.random()
-        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
-                                     save_best_only=True, save_weights_only=True)
-
-        if K.backend() == "tensorflow":
-            tb = TensorBoard()
-            callbacks = [es, reduce_lr, checkpoint, tb]
-        else:
-            callbacks = [es, reduce_lr, checkpoint]
-
-        nb_train_samples = int(nb_samples * (1 - validate))
-        nb_val_samples = nb_samples - nb_train_samples
-
-        index_array = np.arange(nb_samples, dtype=np.int32)
-        if shuffle == 'shuffle':
-            np.random.shuffle(index_array)
-
-        start_time = time.time()
-        try:
-            self.network.fit_generator(generator=generator(file, index_array=index_array[:nb_train_samples],
-                                                           batch_size=batch_size, **generator_options),
-                                       steps_per_epoch=np.ceil(nb_train_samples / batch_size),
-                                       epochs=nb_epoch,
-                                       verbose=verbose,
-                                       callbacks=callbacks + extra_callbacks,
-                                       validation_data=generator(file, index_array=index_array[nb_train_samples:],
-                                                                 batch_size=batch_size, **generator_options),
-                                       validation_steps=np.ceil(nb_val_samples / batch_size))
+                                       validation_data=generator((x_valid, y_valid), classes=classes,
+                                                                 batch_size=batch_size),
+                                       nb_val_samples=len(x_valid))
 
         except KeyboardInterrupt:
             return
@@ -242,25 +178,25 @@ class DeepTrainer:
         return x_valid, y_valid
 
     @staticmethod
-    def _check_and_split_data(data, check_var=None, test_size=.0, stratify=None):
-        return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
+    def _check_and_split_data(data, check_var, test_size=.0, stratify=None):
+
         # Assert inputs and outputs match the model specs
-        # if isinstance(data, np.ndarray):
-        #     # if isinstance(check_var, list):
-        #     #     raise ValueError('Number of inputs does not match model inputs.')
-        #     return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
-        # elif isinstance(data, list):
-        #     # if isinstance(check_var, list):
-        #     #     assert (len(data) == len(check_var)), 'Number of inputs does not match model inputs.'
-        #     # else:
-        #     #     assert (len(data) == check_var.shape[0]), 'Number of inputs does not match model inputs.'
-        #     train, test = zip(
-        #         *[train_test_split(d, test_size=test_size, stratify=stratify, random_state=5) for d in data])
-        #     return list(train), list(test)
-        # elif isinstance(data, dict):
-        #     raise NotImplementedError('Not implemented dictionary splitting yet. Please submit as list')
-        # else:
-        #     raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
+        if isinstance(data, np.ndarray):
+            if isinstance(check_var, list):
+                raise ValueError('Number of inputs does not match model inputs.')
+            return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
+        elif isinstance(data, list):
+            if isinstance(check_var, list):
+                assert (len(data) == len(check_var)), 'Number of inputs does not match model inputs.'
+            else:
+                assert (len(data) == check_var.shape[0]), 'Number of inputs does not match model inputs.'
+            train, test = zip(
+                    *[train_test_split(d, test_size=test_size, stratify=stratify, random_state=5) for d in data])
+            return list(train), list(test)
+        elif isinstance(data, dict):
+            raise NotImplementedError('Not implemented dictionary splitting yet. Please submit as list')
+        else:
+            raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
 
     def fit(self, x_data, y_data,
             nb_inputs=1,
@@ -293,8 +229,7 @@ class DeepTrainer:
             x_train = [[] for _ in x_data]
             x_valid = [[] for _ in x_data]
             for i, x_d in enumerate(x_data):
-                x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.network.inputs[i],
-                                                                    validate, stratify)
+                x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.input[i], validate, stratify)
         if nb_outputs == 1:
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
