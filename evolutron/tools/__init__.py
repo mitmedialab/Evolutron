@@ -2,7 +2,7 @@
 """
     Define the tools top level
 """
-from .data_tools import data_it, load_dataset, file_db
+from .data_tools import data_it, load_dataset, file_db, pad_or_clip_seq
 
 from .seq_tools import (hot2aa, aa2hot, nt2prob, prob2nt,
                         aa_map, aa_map_rev, nt_map)
