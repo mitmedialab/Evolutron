@@ -28,28 +28,19 @@ class Motif(object):
         return True
 
 
-def filter_motif_extraction():
-    # p = (pwm - pwm.min(0)) / pwm.ptp(0)
-    # p_prob = p / p.sum(axis=0)
-    # data = wl.LogoData.from_counts(counts=p_prob.T, alphabet=wl.std_alphabets['protein'])
-    # my_format = wl.LogoFormat(data, options)
-    # my_png = wl.png_formatter(data, my_format)
-    raise NotImplementedError
-
-
 # noinspection PyShadowingNames
-def motif_extraction(motif_fun, x_data, filters, filter_length, handle, depth):
+def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth):
     foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth + 1)
     if not os.path.exists(foldername):
         os.makedirs(foldername)
 
     # Filter visual field
-    vf = filter_length + depth * (filter_length - 1)
+    vf = kernel_size + depth * (kernel_size - 1)
 
     # Calculate the activations for each filter for each protein in data set
     max_seq_scores = []
-    for x_part in data_it(x_data, 5000):
-        seq_scores = [np.squeeze(motif_fun([[y]]), 0) for y in x_part]
+    for x_part in data_it(x_data, 1000):
+        seq_scores = np.squeeze(motif_fun([x_part]), 0)
 
         # For every filter, keep max and argmax for each input protein
         max_seq_scores.append(np.asarray([np.vstack((np.max(x, 0), np.argmax(x, 0))) for x in seq_scores]))
