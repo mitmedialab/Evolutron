@@ -155,7 +155,7 @@ def fasta_parser(filename, codes=False, code_key=None):
     return x_data, y_data
 
 
-def tab_parser(filename, codes=False, code_key=None):
+def csv_parser(filename, codes=False, code_key=None, sep='\t'):
     def fam(x):
         dt = str(x).split(',')
         f = [d for d in dt if d.find(' family') >= 0]
@@ -186,7 +186,7 @@ def tab_parser(filename, codes=False, code_key=None):
     try:
         raw_data = pd.read_hdf(filename.split('.')[0] + '.h5', 'raw_data')
     except FileNotFoundError:
-        raw_data = pd.DataFrame.from_csv(filename, sep='\t', header=0)
+        raw_data = pd.read_csv(filename, sep=sep, header='infer')
         raw_data.columns = raw_data.columns.str.strip().str.lower().str.replace(' ', '_')
         try:
             raw_data['fam'] = raw_data['protein_families'].apply(fam)
@@ -199,10 +199,9 @@ def tab_parser(filename, codes=False, code_key=None):
 
     if codes:
         if type(code_key) == str:
-            pf = raw_data[code_key].astype('category')
-            raw_data['codes'] = pf.cat.codes
-            pos_data = raw_data[raw_data['codes'] > 0]
-            y_data = pos_data.codes.tolist()
+            pos_data = raw_data[raw_data[code_key] != 'Unassigned']
+            code_cats = pos_data[code_key].astype('category').cat.codes
+            y_data = code_cats.tolist()
             y_data = [y + 1 for y in y_data]
             x_data = pos_data.sequence
         else:

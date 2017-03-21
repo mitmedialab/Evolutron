@@ -52,6 +52,7 @@ aa_map_rev = {
     19: 'T',
     20: 'U',
     21: 'O',
+    22: '-'
 }
 
 SecS_map_8cat = {
@@ -170,8 +171,9 @@ def aa2hot(aa_seq, n=20):
 
 
 def hot2aa(hot):
-    num = [np.argmax(h) for h in hot]
-    return ''.join([aa_map_rev[n] for n in num])
+    num = [np.argmax(h) for h in hot if np.sum(h) != 0.0]
+    pad = [22 for h in hot if np.sum(h) == 0.0]
+    return ''.join([aa_map_rev[n] for n in num+pad])
 
 
 def secs2hot(sec_seq, cats=3):

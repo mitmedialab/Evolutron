@@ -119,7 +119,6 @@ class Handle(object):
                  filter_length=None,
                  model=None,
                  ftype=None,
-                 program=None,
                  data_id=None,
                  conv=None,
                  fc=None,
@@ -130,7 +129,6 @@ class Handle(object):
 
         self.model = model
         self.ftype = ftype
-        self.program = program
         self.dataset = data_id
 
         self.n_convs = conv

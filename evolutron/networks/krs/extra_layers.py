@@ -55,14 +55,19 @@ class Reshape(native.Reshape):
 
 
 class Deconvolution1D(_Conv):
-    def __init__(self, bound_conv_layer,
+    def __init__(self, bound_conv_layer=None,
+                 filters=None,
+                 kernel_size=None,
                  apply_mask=False,
                  strides=1,
+                 padding=None,
                  dilation_rate=1,
                  activation=None,
                  use_bias=True,
                  kernel_initializer='glorot_uniform',
                  bias_initializer='zeros',
+                 data_format='channels_last',
+                 rank=1,
                  kernel_regularizer=None,
                  bias_regularizer=None,
                  activity_regularizer=None,
@@ -72,21 +77,21 @@ class Deconvolution1D(_Conv):
 
         self.supports_masking = True
         self.apply_mask = apply_mask
+        if bound_conv_layer:
+            self._bound_conv_layer = bound_conv_layer
+            try:
+                filters = self._bound_conv_layer.input_shape[2]
+            except ValueError:
+                filters = 'Not sure yet, input shape of convolutional layer not provided during construction.'
+            kernel_size = self._bound_conv_layer.kernel_size
+            padding = self._bound_conv_layer.padding
 
-        self._bound_conv_layer = bound_conv_layer
-        try:
-            nb_filter = self._bound_conv_layer.input_shape[2]
-        except ValueError:
-            nb_filter = 'Not sure yet, input shape of convolutional layer not provided during construction.'
-        filter_length = self._bound_conv_layer.kernel_size
-        padding = self._bound_conv_layer.padding
-
-        super(Deconvolution1D, self).__init__(rank=1,
-                                              filters=nb_filter,
-                                              kernel_size=filter_length,
+        super(Deconvolution1D, self).__init__(rank=rank,
+                                              filters=filters,
+                                              kernel_size=kernel_size,
                                               strides=strides,
                                               padding=padding,
-                                              data_format='channels_last',
+                                              data_format=data_format,
                                               dilation_rate=dilation_rate,
                                               activation=activation,
                                               use_bias=use_bias,
@@ -110,8 +115,15 @@ class Deconvolution1D(_Conv):
                              'should be defined. Found `None`.')
         input_dim = input_shape[channel_axis]
 
-        self.filters = self._bound_conv_layer.input_shape[2]
-        self.kernel = K.permute_dimensions(self._bound_conv_layer.kernel, (0, 2, 1))
+        if hasattr(self, '_bound_conv_layer'):
+            self.filters = self._bound_conv_layer.input_shape[2]
+            self.kernel = K.permute_dimensions(self._bound_conv_layer.kernel, (0, 2, 1))
+        else:
+            # This is a hack for loading through "model_from_json". It needs a fix.
+            # For model loading, build first the arch and then load parameters.
+            kernel_shape = self.kernel_size + (input_dim, self.filters)
+
+            self.kernel = K.zeros(kernel_shape)
 
         if self.use_bias:
             self.bias = self.add_weight((self.filters,),
@@ -150,7 +162,8 @@ class Deconvolution1D(_Conv):
 
 
 class Dedense(native.Dense):
-    def __init__(self, bound_dense_layer,
+    def __init__(self, bound_dense_layer=None,
+                 units=None,
                  activation=None,
                  use_bias=True,
                  kernel_initializer='glorot_uniform',
@@ -162,12 +175,13 @@ class Dedense(native.Dense):
                  bias_constraint=None,
                  **kwargs):
 
-        self._bound_dense_layer = bound_dense_layer
+        if bound_dense_layer:
+            self._bound_dense_layer = bound_dense_layer
 
-        try:
-            units = self._bound_dense_layer.input_shape[0]
-        except Exception:
-            units = 'Not sure yet, input shape of dense layer not provided during construction.'
+            try:
+                units = self._bound_dense_layer.input_shape[0]
+            except IndexError:
+                units = 'Not sure yet, input shape of dense layer not provided during construction.'
 
         super(Dedense, self).__init__(units,
                                       activation=activation,
@@ -185,8 +199,13 @@ class Dedense(native.Dense):
         assert len(input_shape) >= 2
         input_dim = input_shape[-1]
 
-        self.units = self._bound_dense_layer.input_shape[1]
-        self.kernel = K.transpose(self._bound_dense_layer.kernel)
+        if hasattr(self, '_bound_dense_layer'):
+            self.units = self._bound_dense_layer.input_shape[1]
+            self.kernel = K.transpose(self._bound_dense_layer.kernel)
+        else:
+            # This is a hack for loading through "model_from_json". It needs a fix.
+            # For model loading, build first the arch and then load parameters.
+            self.kernel = K.zeros((input_dim, self.units))
 
         if self.use_bias:
             self.bias = self.add_weight((self.units,),
@@ -201,7 +220,7 @@ class Dedense(native.Dense):
 
 
 class FeedForwardLSTM(Recurrent):
-    '''Long-Short Term Memory unit - Hochreiter 1997.
+    """Long-Short Term Memory unit - Hochreiter 1997.
 
     For a step-by-step description of the algorithm, see
     [this tutorial](http://deeplearning.net/tutorial/lstm.html).
@@ -233,7 +252,7 @@ class FeedForwardLSTM(Recurrent):
         - [Learning to forget: Continual prediction with LSTM](http://www.mitpressjournals.org/doi/pdf/10.1162/089976600300015015)
         - [Supervised sequence labeling with recurrent neural networks](http://www.cs.toronto.edu/~graves/preprint.pdf)
         - [A Theoretically Grounded Application of Dropout in Recurrent Neural Networks](http://arxiv.org/abs/1512.05287)
-    '''
+    """
 
     def __init__(self, output_dim,
                  init='glorot_uniform', inner_init='orthogonal',
