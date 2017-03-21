@@ -3,12 +3,22 @@
 from __future__ import print_function
 
 import os
+import shutil
 import numpy as np
 
 import weblogolib as wl
 from corebio.seq_io import SeqList
 
 from evolutron.tools import hot2aa, data_it
+
+
+def make_pfm(layer_weights):
+    max_scale = layer_weights.max(axis=-1).max(axis=-1)[...,
+                                                        np.newaxis, np.newaxis]
+    min_scale = layer_weights.min(axis=-1).min(axis=-1)[...,
+                                                        np.newaxis, np.newaxis]
+    return (10000 * (layer_weights - min_scale) /
+            (max_scale - min_scale)).astype('uint16')
 
 
 class Motif(object):
@@ -32,6 +42,9 @@ class Motif(object):
 def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth):
     foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth + 1)
     if not os.path.exists(foldername):
+        os.makedirs(foldername)
+    else:
+        shutil.rmtree(foldername)
         os.makedirs(foldername)
 
     # Filter visual field
@@ -93,7 +106,7 @@ def generate_logos(motifs, foldername):
             # foo = open(foldername + '/' + str(i) + ".png", "w")
             # foo.write(my_png)
             # foo.close()
-            foo = open(foldername + str(i) + ".pdf", "wb")
+            foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".pdf", "wb")
             foo.write(my_pdf)
             foo.close()
             # foo = open(foldername + str(i) + ".txt", "w")

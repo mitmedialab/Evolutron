@@ -30,17 +30,17 @@ def test_fasta_parser():
 
 def test_tab_parser():
 
-    x_data, y_data = io.tab_parser('tests/test_tools/samples/sample.tsv', codes=False)
+    x_data, y_data = io.csv_parser('tests/test_tools/samples/sample.tsv', codes=False)
 
     assert type(x_data) == pd.Series
     assert not y_data
 
-    x_data, y_data = io.tab_parser('tests/test_tools/samples/sample.tsv', codes=True, code_key='fam')
+    x_data, y_data = io.csv_parser('tests/test_tools/samples/sample.tsv', codes=True, code_key='fam')
 
     assert type(x_data) == pd.Series
     assert type(y_data) == list
 
-    x_data, y_data = io.tab_parser('tests/test_tools/samples/sample.tsv', codes=False)
+    x_data, y_data = io.csv_parser('tests/test_tools/samples/sample.tsv', codes=False)
 
     assert type(x_data) == pd.Series
     assert not y_data

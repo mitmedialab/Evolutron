@@ -54,6 +54,7 @@ def pad_or_clip_seq(x, n):
 
 
 def load_dataset(data_id,
+                 infile=None,
                  one_hot='x',
                  padded=True,
                  pad_y_data=False,
@@ -65,14 +66,20 @@ def load_dataset(data_id,
                  **parser_options):
     """Fetches the correct dataset from database based on data_id.
     """
-    try:
-        filename = file_db[data_id]
-        filetype = filename.split('.')[-1]
-    except KeyError:
-        raise IOError('Dataset id not in file database.')
+    if data_id == 'file':
+        filename = infile
+    else:
+        try:
+            filename = file_db[data_id]
+        except KeyError:
+            raise IOError('Dataset id not in file database.')
+
+    filetype = filename.split('.')[-1]
 
     if filetype == 'tsv':
-        x_data, y_data = io.tab_parser(filename, codes, code_key)
+        x_data, y_data = io.csv_parser(filename, codes, code_key, sep='\t')
+    elif filetype == 'csv':
+        x_data, y_data = io.csv_parser(filename, codes, code_key, sep=',')
     elif filetype == 'fasta':
         x_data, y_data = io.fasta_parser(filename, codes, code_key)
     elif filetype == 'sec':
