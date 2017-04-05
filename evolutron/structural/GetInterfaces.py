@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import random
 from optparse import OptionParser
@@ -49,7 +51,7 @@ def get_contacts(struc, all_atoms, verbose, cutoff):
     for residue in struc:
         progress += 1
         if len(verbose) > 0:
-            print verbose, progress, "out of", len(struc)
+            print(verbose, progress, "out of", len(struc))
         atom_list = struc[residue]
         outcome = is_contact(atom_list, all_atoms, cutoff)
         if outcome:
@@ -151,19 +153,19 @@ if (options.f1 and options.f1 and options.c1 and options.c2):
     if (options.cutoff):
         cutoff = float(options.cutoff)
     else:
-        print "No contact cutoff supplied, using default of 4.5A"
+        print("No contact cutoff supplied, using default of 4.5A")
     if (options.interfacial):
         i_cutoff = float(options.interfacial)
     else:
-        print "No interfacial cutoff supplied, using default of 10.0A"
+        print("No interfacial cutoff supplied, using default of 10.0A")
     if (options.jobid):
         out_folder = "out_" + options.jobid
     else:
         out_folder = "out_" + str(random.randint(0, 999999))
-        print "No job_id supplied, creating a folder with a random name: " + out_folder
+        print("No job_id supplied, creating a folder with a random name: " + out_folder)
 else:
-    print "Not enough input arguments supplied"
-    print usage
+    print("Not enough input arguments supplied")
+    print(usage)
     quit()
 
 cwd = os.getcwd()
@@ -183,11 +185,11 @@ atoms_2 = Selection.unfold_entities(str_2, 'C')  # C for chains
 # get the mapping from chain,residue id to the atom lists
 input_1 = get_atom_list(atoms_1, chains_1)
 if len(input_1) == 0:
-    print "Are you sure that file " + options.f1 + " has chain(s) " + options.c1 + "? Quitting."
+    print("Are you sure that file " + options.f1 + " has chain(s) " + options.c1 + "? Quitting.")
     quit()
 input_2 = get_atom_list(atoms_2, chains_2)
 if len(input_2) == 0:
-    print "Are you sure that file " + options.f2 + " has chain(s) " + options.c2 + "? Quitting."
+    print("Are you sure that file " + options.f2 + " has chain(s) " + options.c2 + "? Quitting.")
     quit()
 
 # get the full atom lists for neighbor search
@@ -256,4 +258,4 @@ save_constrained(cwd + "/" + out_folder + "/molecule_1.pdb", cwd + "/" + out_fol
 save_constrained(cwd + "/" + out_folder + "/molecule_2.pdb", cwd + "/" + out_folder + "/molecule_2_constrained.pdb",
                  interface_2)
 
-print "Results saved in " + cwd + "/" + out_folder
+print("Results saved in " + cwd + "/" + out_folder)

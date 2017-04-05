@@ -216,6 +216,29 @@ def csv_parser(filename, codes=False, code_key=None, sep='\t'):
     return x_data, y_data
 
 
+def h5_parser(filename, key='raw_data', x_codes='sequence', y_codes=None):
+    raw_data = pd.read_hdf(filename, key)
+
+    if y_codes:
+        if type(y_codes) == str:
+            pos_data = raw_data[raw_data[y_codes].notnull()]
+            y_data = pos_data[y_codes].values
+        else:
+            pf = raw_data[y_codes]
+            pos_data = raw_data[pf[y_codes[0]].notnull() & pf[y_codes[1]].notnull()]
+            y_data = [pos_data[code].values for code in y_codes]
+    else:
+        pos_data = raw_data
+        y_data = None
+
+    if type(x_codes) == str:
+        x_data = pos_data[x_codes]
+    else:
+        x_data = [pos_data[code] for code in x_codes]
+
+    return x_data, y_data
+
+
 def secs_parser(filename, nb_categories=8, nb_aa=20, dummy_option=None):
     """
         This module parses data from files containing sequence and secondary structure
