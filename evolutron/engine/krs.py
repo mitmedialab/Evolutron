@@ -11,41 +11,30 @@ from tabulate import tabulate
 
 import keras.backend as K
 import keras.optimizers as opt
-from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping, Callback
+from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
 from sklearn.model_selection import train_test_split
 
 if K.backend() == 'theano':
     from theano.compile.nanguardmode import NanGuardMode
     from theano.compile.monitormode import MonitorMode
 
-from sklearn.metrics import precision_score
-
-
-class ClassificationMetrics(Callback):
-
-    # def __init__(self, validation_data):
-    #     # self.validation_data = validation_data
-    #     super(ClassificationMetrics, self).__init__()
-
-    def on_train_begin(self, logs=None):
-        self.prfs = []
-
-    def on_epoch_end(self, epoch, logs=None):
-        y_pred = self.model.predict(self.validation_data[0])
-        self.prfs.append(precision_score(np.argmax(self.validation_data[1], axis=1), np.argmax(y_pred,axis=1), average='weighted'))
-        print('Precision Score is %s' % self.prfs[-1])
-        print('random')
-
 
 class DeepTrainer:
     def __init__(self,
                  network,
                  classification=False,
-                 verbose=False):
+                 verbose=False,
+                 generator=None,
+                 nb_inputs=1,
+                 nb_outputs=1):
 
         self.verbose = verbose
+        self.generator = generator
+        self.nb_inputs = nb_inputs
+        self.nb_outputs = nb_outputs
 
         self.network = network
+        self.network.generator = generator
         try:
             self.input = network.input
             self.output = network.output
@@ -112,11 +101,13 @@ class DeepTrainer:
 
         self._funcs_init = True
 
-    def fit_generator(self, x_data, y_data, generator, nb_epoch=1, batch_size=64, shuffle=True,
+    def fit_generator(self, x_data, y_data, generator=None, nb_epoch=1, batch_size=64, shuffle=True,
                       validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                      reduce_factor=.5, nb_inputs=1, nb_outputs=1, **generator_options):
+                      reduce_factor=.5, **generator_options):
 
         # Check arguments
+        if generator is None:
+            generator = self.generator
         if extra_callbacks is None:
             extra_callbacks = []
         assert (validate >= 0)
@@ -127,7 +118,7 @@ class DeepTrainer:
         else:
             stratify = None
 
-        if nb_inputs == 1:
+        if self.nb_inputs == 1:
             x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
         else:
             stratify = None
@@ -136,7 +127,7 @@ class DeepTrainer:
             for i, x_d in enumerate(x_data):
                 x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.network.inputs[i],
                                                                     validate, stratify)
-        if nb_outputs == 1:
+        if self.nb_outputs == 1:
             y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
         else:
             stratify = None
@@ -169,12 +160,15 @@ class DeepTrainer:
         else:
             callbacks = [es, reduce_lr, checkpoint]
 
-        if nb_inputs == 1:
+        if self.nb_inputs == 1:
             nb_train_samples = len(x_train)
             nb_val_samples = len(x_valid)
         else:
             nb_train_samples = len(x_train[0])
             nb_val_samples = len(x_valid[0])
+
+        for cb in extra_callbacks:
+            cb.validation_data = (x_valid, y_valid)
 
         start_time = time.time()
         try:
@@ -200,7 +194,6 @@ class DeepTrainer:
                                                                           time.time() - start_time))
 
         return x_valid, y_valid
-
 
     def fit_generator_from_file(self, file, generator, nb_samples, nb_epoch=1, batch_size=64, shuffle=True,
                                 validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
@@ -380,6 +373,20 @@ class DeepTrainer:
     def score(self, x_data, y_data, **options):
         return self.network.evaluate(x_data, y_data, verbose=options.pop('verbose', 0), **options)
 
+    def score_generator(self, x_data, y_data, generator=None, batch_size=1, **options):
+        if generator is None:
+            generator = self.generator
+
+        if self.nb_inputs == 1:
+            nb_train_samples = len(x_data)
+        else:
+            nb_train_samples = len(x_data[0])
+
+        return self.network.evaluate_generator(generator=generator(x_data, y_data, batch_size=batch_size, shuffle=False),
+                                               steps=np.ceil(nb_train_samples / batch_size),
+                                               workers=4)
+        # (x_data, y_data, verbose=options.pop('verbose', 0), **options)
+
     def predict_proba(self, x_data):
         return self.network.predict_proba(x_data)
 
@@ -388,6 +395,18 @@ class DeepTrainer:
 
     def predict(self, x_data):
         return self.network.predict(x_data)
+
+    def predict_generator(self, x_data, generator=None, batch_size=1):
+        if generator is None:
+            generator = self.generator
+
+        if self.nb_inputs == 1:
+            nb_train_samples = len(x_data)
+        else:
+            nb_train_samples = len(x_data[0])
+
+        return self.network.predict_generator(generator=generator(x_data, batch_size=batch_size, shuffle=False),
+                                              steps=np.ceil(nb_train_samples / batch_size))
 
     def display_network_info(self):
 

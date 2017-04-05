@@ -36,14 +36,17 @@ file_db = {
 }
 
 
-def data_it(dataset, block_size):
+def data_it(dataset, block_size, multidata=False):
     """ Iterates through a large array, yielding chunks of block_size.
     """
     size = len(dataset)
 
     for start_idx in range(0, size, block_size):
         excerpt = slice(start_idx, min(start_idx + block_size, size))
-        yield dataset[excerpt]
+        if multidata:
+            yield [x[excerpt] for x in dataset]
+        else:
+            yield dataset[excerpt]
 
 
 def pad_or_clip_seq(x, n):
@@ -86,6 +89,8 @@ def load_dataset(data_id,
         x_data, y_data = io.secs_parser(filename, nb_aa=nb_aa, **parser_options)
     elif filetype == 'gz':
         x_data, y_data = io.npz_parser(filename, nb_aa=nb_aa, **parser_options)
+    elif filetype == 'h5':
+        x_data, y_data = io.h5_parser(filename, **parser_options)
     else:
         raise NotImplementedError('There is no parser for current file type.')
 
@@ -117,7 +122,7 @@ def load_dataset(data_id,
     data_size = len(x_data)
     print('Dataset size: {0}'.format(data_size))
 
-    if y_data:
+    if filetype != 'h5' and y_data:
         try:
             assert ((len(x_data) == len(y_data)) or (len(x_data) == len(y_data[0])))
         except AssertionError:
