@@ -11,12 +11,30 @@ from tabulate import tabulate
 
 import keras.backend as K
 import keras.optimizers as opt
-from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
+from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping, Callback
 from sklearn.model_selection import train_test_split
 
 if K.backend() == 'theano':
     from theano.compile.nanguardmode import NanGuardMode
     from theano.compile.monitormode import MonitorMode
+
+from sklearn.metrics import precision_score
+
+
+class ClassificationMetrics(Callback):
+
+    # def __init__(self, validation_data):
+    #     # self.validation_data = validation_data
+    #     super(ClassificationMetrics, self).__init__()
+
+    def on_train_begin(self, logs=None):
+        self.prfs = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        y_pred = self.model.predict(self.validation_data[0])
+        self.prfs.append(precision_score(np.argmax(self.validation_data[1], axis=1), np.argmax(y_pred,axis=1), average='weighted'))
+        print('Precision Score is %s' % self.prfs[-1])
+        print('random')
 
 
 class DeepTrainer:
@@ -326,6 +344,10 @@ class DeepTrainer:
         if K.backend() == "tensorflow":
             tb = TensorBoard()
             callbacks.append(tb)
+
+        if self.classification:
+            # callbacks.append(ClassificationMetrics((x_valid, y_valid)))
+            callbacks.append(ClassificationMetrics())
 
         start_time = time.time()
         try:
