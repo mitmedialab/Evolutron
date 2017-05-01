@@ -10,4 +10,5 @@ from .seq_tools import (hot2aa, aa2hot, nt2prob, prob2nt,
 from .utils import (shape, none2str, probability, get_args, nested_to_categorical, nested_unique, Handle)
 
 from .visual import (plot_loss_history)
+from .structure_tools import *
 

@@ -195,11 +195,13 @@ class DeepTrainer:
 
         return x_valid, y_valid
 
-    def fit_generator_from_file(self, file, generator, nb_samples, nb_epoch=1, batch_size=64, shuffle=True,
+    def fit_generator_from_file(self, file, nb_samples, generator=None, nb_epoch=1, batch_size=64, shuffle=True,
                                 validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
                                 reduce_factor=.5, **generator_options):
 
         # Check arguments
+        if generator is None:
+            generator = self.generator
         if extra_callbacks is None:
             extra_callbacks = []
         assert (validate >= 0)
@@ -228,14 +230,12 @@ class DeepTrainer:
 
         start_time = time.time()
         try:
-            self.network.fit_generator(generator=generator(file, index_array=index_array[:nb_train_samples],
-                                                           batch_size=batch_size, **generator_options),
+            self.network.fit_generator(generator=generator(file, batch_size=batch_size, **generator_options),
                                        steps_per_epoch=np.ceil(nb_train_samples / batch_size),
                                        epochs=nb_epoch,
                                        verbose=verbose,
                                        callbacks=callbacks + extra_callbacks,
-                                       validation_data=generator(file, index_array=index_array[nb_train_samples:],
-                                                                 batch_size=batch_size, **generator_options),
+                                       validation_data=generator(file, batch_size=batch_size, **generator_options),
                                        validation_steps=np.ceil(nb_val_samples / batch_size))
 
         except KeyboardInterrupt:
@@ -249,7 +249,7 @@ class DeepTrainer:
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
                                                                           time.time() - start_time))
 
-        return x_valid, y_valid
+        return
 
     @staticmethod
     def _check_and_split_data(data, check_var=None, test_size=.0, stratify=None):
@@ -373,19 +373,24 @@ class DeepTrainer:
     def score(self, x_data, y_data, **options):
         return self.network.evaluate(x_data, y_data, verbose=options.pop('verbose', 0), **options)
 
-    def score_generator(self, x_data, y_data, generator=None, batch_size=1, **options):
+    def score_generator(self, generator=None, batch_size=1, **options):
         if generator is None:
             generator = self.generator
 
-        if self.nb_inputs == 1:
-            nb_train_samples = len(x_data)
+        if 'x_data' in options:
+            if self.nb_inputs == 1:
+                nb_samples = len(options.x_data)
+            else:
+                nb_samples = len(options.x_data[0])
         else:
-            nb_train_samples = len(x_data[0])
+            try:
+                nb_samples = options.pop('nb_samples')
+            except IndexError:
+                raise IndexError('Must give x_data or nb_samples argumnet')
 
-        return self.network.evaluate_generator(generator=generator(x_data, y_data, batch_size=batch_size, shuffle=False),
-                                               steps=np.ceil(nb_train_samples / batch_size),
-                                               workers=4)
-        # (x_data, y_data, verbose=options.pop('verbose', 0), **options)
+        return self.network.evaluate_generator(generator=generator(batch_size=batch_size, shuffle=False, **options),
+                                               steps=np.ceil(nb_samples / batch_size),
+                                               workers=1)
 
     def predict_proba(self, x_data):
         return self.network.predict_proba(x_data)
