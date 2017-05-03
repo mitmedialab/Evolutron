@@ -1,5 +1,6 @@
 # coding=utf-8
 import keras.backend as K
+import sklearn.metrics as metrics
 
 Beta = 1
 
@@ -148,3 +149,23 @@ def micro_fmeasure(y_true, y_pred):
     recall_value = micro_recall(y_true, y_pred)
 
     return ((Beta ** 2 + 1) * precision_value * recall_value) / (Beta ** 2 * precision_value + recall_value)
+
+
+def explained_variance_score(y_true, y_pred):
+    return 1 - K.var(y_true-y_pred, axis=0)/K.var(y_true, axis=0)
+
+
+def r2_score(y_true, y_pred):
+    return 1 - K.sum(K.pow(y_true-y_pred, 2))/K.sum(K.pow(y_true-K.mean(y_true, keepdims=True), 2))
+
+
+def mean_absolute_err(y_true, y_pred):
+    return K.mean(K.abs(y_true - y_pred))
+
+
+def MAE(y_true, y_pred):
+    return mean_absolute_err(y_true=y_true, y_pred=y_pred)
+
+
+def absolute_err_variance(y_true, y_pred):
+    return K.var(K.abs(y_true - y_pred))
