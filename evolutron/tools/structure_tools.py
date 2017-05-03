@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
+import time
 
 
 elements_map = {'H': 0,
@@ -11,7 +12,7 @@ elements_map = {'H': 0,
                 'X': 5}
 
 
-def PDBdf2npArray(atoms, res):
+def PDBdf2npArray(atoms, res, size=np.Inf):
     num_channels = len(elements_map)
 
     x_coord = (((atoms.x_coord - atoms.x_coord.min()) / res).astype(int)).values
@@ -20,12 +21,22 @@ def PDBdf2npArray(atoms, res):
     channel_coord = np.vectorize(lambda x: elements_map[x])(atoms.element_symbol.values)
 
     max_size = max([x_coord.max(), y_coord.max(), z_coord.max()]) + 1
+
+    if size >= max_size:
+        max_size = size
+        clip_flag = False
+    else:
+        clip_flag = True
+
     shape = (max_size, max_size, max_size, num_channels)
 
     arr = np.zeros(shape=shape, dtype=np.bool)
     arr[x_coord, y_coord, z_coord, channel_coord] = 1
 
-    return arr
+    if clip_flag:
+        arr = arr[:size, :size, :size, :]
+
+    return arr, clip_flag
 
 
 def rotatePDBdf(df, angles):
@@ -39,7 +50,7 @@ def rotatePDBdf(df, angles):
                   [cos[1]*sin[2], cos[0]*cos[2]+sin[0]*sin[1]*sin[2], -cos[2]*sin[0]+cos[0]*sin[1]*sin[2]],
                   [-sin[1], cos[1]*sin[0], cos[0]*cos[1]]])
 
-    M = np.array([df.x_coors.values, df.y_coord.values, df.z_coord.values])
+    M = np.array([df.x_coord.values, df.y_coord.values, df.z_coord.values])
 
     rotM = np.matmul(R, M)
 

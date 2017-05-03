@@ -37,6 +37,6 @@ class AucCallback(Callback):
             y_pred = self.model.predict_generator(self.model.generator(self.validation_data[0], batch_size=50),
                                                   steps=np.ceil(nb_samples / 50))
 
-        self.prfs.append(roc_auc_score(y_true=self.validation_data[1], y_score=y_pred))
+        self.prfs.append(roc_auc_score(y_true=self.validation_data[1].astype(np.bool), y_score=y_pred))
         print('AUC Score is %s' % self.prfs[-1])
         print('random')

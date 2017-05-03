@@ -103,7 +103,7 @@ class DeepTrainer:
 
     def fit_generator(self, x_data, y_data, generator=None, nb_epoch=1, batch_size=64, shuffle=True,
                       validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                      reduce_factor=.5, **generator_options):
+                      reduce_factor=.5, workers=1, **generator_options):
 
         # Check arguments
         if generator is None:
@@ -180,7 +180,8 @@ class DeepTrainer:
                                        callbacks=callbacks + extra_callbacks,
                                        validation_data=generator(x_valid, y_valid, batch_size=batch_size,
                                                                  **generator_options),
-                                       validation_steps=np.ceil(nb_val_samples / batch_size))
+                                       validation_steps=np.ceil(nb_val_samples / batch_size),
+                                       workers=workers)
 
         except KeyboardInterrupt:
             return
@@ -197,7 +198,7 @@ class DeepTrainer:
 
     def fit_generator_from_file(self, file, nb_samples, generator=None, nb_epoch=1, batch_size=64, shuffle=True,
                                 validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                                reduce_factor=.5, **generator_options):
+                                reduce_factor=.5, workers=1, **generator_options):
 
         # Check arguments
         if generator is None:
@@ -236,7 +237,8 @@ class DeepTrainer:
                                        verbose=verbose,
                                        callbacks=callbacks + extra_callbacks,
                                        validation_data=generator(file, batch_size=batch_size, **generator_options),
-                                       validation_steps=np.ceil(nb_val_samples / batch_size))
+                                       validation_steps=np.ceil(nb_val_samples / batch_size),
+                                       workers=workers)
 
         except KeyboardInterrupt:
             return
