@@ -9,9 +9,11 @@ from collections import OrderedDict, defaultdict
 import numpy as np
 from tabulate import tabulate
 
+import keras
 import keras.backend as K
 import keras.optimizers as opt
-from keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau, EarlyStopping
+from keras.callbacks import ModelCheckpoint
+
 from sklearn.model_selection import train_test_split
 
 if K.backend() == 'theano':
@@ -19,9 +21,8 @@ if K.backend() == 'theano':
     from theano.compile.monitormode import MonitorMode
 
 
-class DeepTrainer:
-    def __init__(self,
-                 network,
+class Model(keras.models.Model):
+    def __init__(self, inputs, outputs, name=None,
                  classification=False,
                  verbose=False,
                  generator=None,
@@ -32,15 +33,6 @@ class DeepTrainer:
         self.generator = generator
         self.nb_inputs = nb_inputs
         self.nb_outputs = nb_outputs
-
-        self.network = network
-        self.network.generator = generator
-        try:
-            self.input = network.input
-            self.output = network.output
-        except AttributeError:
-            self.input = network.inputs
-            self.output = network.outputs
 
         self.classification = classification
 
@@ -54,9 +46,12 @@ class DeepTrainer:
         self.fold_val_losses = None
         self.k_fold_history = defaultdict(list)
 
-        self._funcs_init = False
+        self.history_list = []
 
-    def compile(self, optimizer, **options):
+        super(Model, self).__init__(inputs=inputs, outputs=outputs, name=name)
+
+    def compile(self, optimizer, loss, metrics=None, loss_weights=None,
+                sample_weight_mode=None, **options):
 
         opts = {'sgd': opt.SGD(lr=options.get('lr', .01),
                                decay=options.get('decay', 1e-6),
@@ -78,40 +73,43 @@ class DeepTrainer:
                      }
             mode = modes[mode]
 
-            self.network.compile(loss=options.get('loss_function', self.network._loss_function),
-                                 loss_weights=options.get('loss_weights', None),
-                                 optimizer=opts[optimizer],
-                                 metrics=self.network.metrics,
-                                 mode=mode)
+            super(Model, self).compile(loss=loss,
+                                       loss_weights=loss_weights,
+                                       optimizer=opts[optimizer],
+                                       metrics=metrics,
+                                       sample_weight_mode=sample_weight_mode,
+                                       mode=mode)
         else:
-            self.network.compile(loss=options.get('loss_function', self.network._loss_function),
-                                 loss_weights=options.get('loss_weights', None),
-                                 optimizer=opts[optimizer],
-                                 metrics=self.network.metrics)
+            super(Model, self).compile(loss=loss,
+                                       loss_weights=loss_weights,
+                                       optimizer=opts[optimizer],
+                                       sample_weight_mode=sample_weight_mode,
+                                       metrics=metrics)
 
-        self._create_functions()
-
-    def _create_functions(self):
-        if getattr(self, '_funcs_init', True):
-            return
-
-        self.train_fn = self.network._make_train_function()
-        self.predict_fn = self.network._make_predict_function()
-        self.test_fn = self.network._make_test_function()
-
-        self._funcs_init = True
-
-    def fit_generator(self, x_data, y_data, generator=None, nb_epoch=1, batch_size=64, shuffle=True,
-                      validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                      reduce_factor=.5, workers=1, **generator_options):
+    def fit_generator(self, x_data, y_data,
+                      generator=None,
+                      epochs=1,
+                      verbose=1,
+                      callbacks=None,
+                      validation_data=None,
+                      validation_split=.0,
+                      validation_steps=None,
+                      class_weight=None,
+                      max_q_size=10,
+                      workers=1,
+                      pickle_safe=False,
+                      initial_epoch=0,
+                      batch_size=64, shuffle=True,
+                      return_best_model=True,
+                      monitor='val_loss',
+                      **generator_options):
 
         # Check arguments
         if generator is None:
             generator = self.generator
-        if extra_callbacks is None:
-            extra_callbacks = []
-        assert (validate >= 0)
-        assert nb_epoch > 0
+
+        assert (validation_split >= 0)
+        assert epochs > 0
 
         if self.classification:
             stratify = y_data  # TODO: here you should select with which part to stratify
@@ -119,46 +117,23 @@ class DeepTrainer:
             stratify = None
 
         if self.nb_inputs == 1:
-            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
+            x_train, x_valid = train_test_split(x_data, self.input, test_size=validation_split, stratify=stratify)
         else:
             stratify = None
             x_train = [[] for _ in x_data]
             x_valid = [[] for _ in x_data]
             for i, x_d in enumerate(x_data):
-                x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.network.inputs[i],
-                                                                    validate, stratify)
+                x_train[i], x_valid[i] = train_test_split(x_d, self.inputs[i], test_size=validation_split,
+                                                          stratify=stratify)
         if self.nb_outputs == 1:
-            y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
+            y_train, y_valid = train_test_split(y_data, self.output, test_size=validation_split, stratify=stratify)
         else:
             stratify = None
             y_train = [[] for _ in y_data]
             y_valid = [[] for _ in y_data]
             for i, y_d in enumerate(y_data):
-                y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
-        # Callbacks
-        es = EarlyStopping(monitor='val_loss',
-                           min_delta=0.0001,
-                           patience=patience,
-                           verbose=1,
-                           mode='min')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss',
-                                      factor=reduce_factor,
-                                      patience=5,
-                                      min_lr=0.001,
-                                      verbose=1)
-        rn = np.random.random()
-        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
-                                     monitor='val_loss',
-                                     verbose=1,
-                                     mode='min',
-                                     save_best_only=True,
-                                     save_weights_only=True)
-
-        if K.backend() == "tensorflow":
-            tb = TensorBoard()
-            callbacks = [es, reduce_lr, checkpoint, tb]
-        else:
-            callbacks = [es, reduce_lr, checkpoint]
+                y_train[i], y_valid[i] = train_test_split(y_d, self.output[i], test_size=validation_split,
+                                                          stratify=stratify)
 
         if self.nb_inputs == 1:
             nb_train_samples = len(x_train)
@@ -167,192 +142,199 @@ class DeepTrainer:
             nb_train_samples = len(x_train[0])
             nb_val_samples = len(x_valid[0])
 
-        for cb in extra_callbacks:
+        if return_best_model:
+            rn = np.random.random()
+            checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
+                                         monitor=monitor,
+                                         verbose=1,
+                                         mode='min',
+                                         save_best_only=True,
+                                         save_weights_only=True)
+            callbacks.append(checkpoint)
+
+        for cb in callbacks:
             cb.validation_data = (x_valid, y_valid)
 
         start_time = time.time()
         try:
-            self.network.fit_generator(generator=generator(x_train, y_train, batch_size=batch_size,
-                                                           shuffle=shuffle, **generator_options),
-                                       steps_per_epoch=np.ceil(nb_train_samples / batch_size),
-                                       epochs=nb_epoch,
-                                       verbose=verbose,
-                                       callbacks=callbacks + extra_callbacks,
-                                       validation_data=generator(x_valid, y_valid, batch_size=batch_size,
-                                                                 **generator_options),
-                                       validation_steps=np.ceil(nb_val_samples / batch_size),
-                                       workers=workers)
+            super(Model, self).fit_generator(generator=generator(x_train, y_train, batch_size=batch_size,
+                                                                 shuffle=shuffle, **generator_options),
+                                             steps_per_epoch=np.ceil(nb_train_samples / batch_size),
+                                             epochs=epochs,
+                                             verbose=verbose,
+                                             callbacks=callbacks,
+                                             validation_data=generator(x_valid, y_valid, batch_size=batch_size,
+                                                                       **generator_options),
+                                             validation_steps=np.ceil(nb_val_samples / batch_size),
+                                             workers=workers,
+                                             max_q_size=max_q_size,
+                                             pickle_safe=pickle_safe,
+                                             initial_epoch=initial_epoch)
 
         except KeyboardInterrupt:
             return
 
         if return_best_model:
-            self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+            try:
+                self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+            except:
+                print('Unable to load best parameters, saving current model.')
 
-        self.history = self.network.history
+        self.history_list.append(self.history)
 
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
                                                                           time.time() - start_time))
 
         return x_valid, y_valid
 
-    def fit_generator_from_file(self, file, nb_samples, generator=None, nb_epoch=1, batch_size=64, shuffle=True,
-                                validate=.0, patience=10, return_best_model=True, verbose=1, extra_callbacks=None,
-                                reduce_factor=.5, workers=1, **generator_options):
+    def fit_generator_from_file(self, file, nb_samples,
+                                generator=None,
+                                epochs=1,
+                                verbose=1,
+                                callbacks=None,
+                                validation_data=None,
+                                validation_split=.0,
+                                class_weight=None,
+                                max_q_size=10,
+                                workers=1,
+                                pickle_safe=False,
+                                initial_epoch=0,
+                                batch_size=64, shuffle=True,
+                                return_best_model=True,
+                                monitor='val_loss',
+                                **generator_options):
 
         # Check arguments
         if generator is None:
             generator = self.generator
-        if extra_callbacks is None:
-            extra_callbacks = []
-        assert (validate >= 0)
-        assert nb_epoch > 0
 
-        # Callbacks
-        es = EarlyStopping(monitor='val_loss', patience=patience, verbose=1, mode='auto')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=reduce_factor,
-                                      patience=patience / 2, min_lr=0.001, verbose=1)
-        rn = np.random.random()
-        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn), monitor='val_loss', verbose=1, mode='min',
-                                     save_best_only=True, save_weights_only=True)
+        assert (validation_split >= 0)
+        assert epochs > 0
 
-        if K.backend() == "tensorflow":
-            tb = TensorBoard()
-            callbacks = [es, reduce_lr, checkpoint, tb]
-        else:
-            callbacks = [es, reduce_lr, checkpoint]
-
-        nb_train_samples = int(nb_samples * (1 - validate))
+        nb_train_samples = int(nb_samples * (1 - validation_split))
         nb_val_samples = nb_samples - nb_train_samples
 
         index_array = np.arange(nb_samples, dtype=np.int32)
         if shuffle == 'shuffle':
             np.random.shuffle(index_array)
 
+        if return_best_model:
+            rn = np.random.random()
+            checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
+                                         monitor=monitor,
+                                         verbose=1,
+                                         mode='min',
+                                         save_best_only=True,
+                                         save_weights_only=True)
+            callbacks.append(checkpoint)
+
         start_time = time.time()
         try:
-            self.network.fit_generator(generator=generator(file, batch_size=batch_size, **generator_options),
-                                       steps_per_epoch=np.ceil(nb_train_samples / batch_size),
-                                       epochs=nb_epoch,
-                                       verbose=verbose,
-                                       callbacks=callbacks + extra_callbacks,
-                                       validation_data=generator(file, batch_size=batch_size, **generator_options),
-                                       validation_steps=np.ceil(nb_val_samples / batch_size),
-                                       workers=workers)
+            super(Model, self).fit_generator(generator=generator(file, batch_size=batch_size, **generator_options),
+                                             steps_per_epoch=np.ceil(nb_train_samples / batch_size),
+                                             epochs=epochs,
+                                             verbose=verbose,
+                                             callbacks=callbacks,
+                                             validation_data=generator(file, batch_size=batch_size,
+                                                                       **generator_options),
+                                             validation_steps=np.ceil(nb_val_samples / batch_size),
+                                             workers=workers,
+                                             max_q_size=max_q_size,
+                                             initial_epoch=initial_epoch,
+                                             class_weight=class_weight,
+                                             pickle_safe=pickle_safe)
 
         except KeyboardInterrupt:
             return
 
         if return_best_model:
-            self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+            try:
+                self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
+            except:
+                print('Unable to load best parameters, saving current model.')
 
-        self.history = self.network.history
+        self.history_list.append(self.history)
 
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
                                                                           time.time() - start_time))
 
         return
 
-    @staticmethod
-    def _check_and_split_data(data, check_var=None, test_size=.0, stratify=None):
-        return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
-        # Assert inputs and outputs match the model specs
-        # if isinstance(data, np.ndarray):
-        #     # if isinstance(check_var, list):
-        #     #     raise ValueError('Number of inputs does not match model inputs.')
-        #     return train_test_split(data, test_size=test_size, stratify=stratify, random_state=5)
-        # elif isinstance(data, list):
-        #     # if isinstance(check_var, list):
-        #     #     assert (len(data) == len(check_var)), 'Number of inputs does not match model inputs.'
-        #     # else:
-        #     #     assert (len(data) == check_var.shape[0]), 'Number of inputs does not match model inputs.'
-        #     train, test = zip(
-        #         *[train_test_split(d, test_size=test_size, stratify=stratify, random_state=5) for d in data])
-        #     return list(train), list(test)
-        # elif isinstance(data, dict):
-        #     raise NotImplementedError('Not implemented dictionary splitting yet. Please submit as list')
-        # else:
-        #     raise ValueError('Input data has unrecognizable format. Expecting either numpy.ndarray, list or dictionary')
-
-    def fit(self, x_data, y_data,
-            nb_inputs=1,
-            nb_outputs=1,
+    def fit(self, x=None, y=None,
+            batch_size=32,
             epochs=1,
-            batch_size=64,
-            shuffle=True,
-            validate=.2,
-            patience=10,
-            return_best_model=True,
+            initial_epoch=0,
             verbose=1,
-            extra_callbacks=None,
-            reduce_factor=.5):
+            callbacks=None,
+            validation_split=0.,
+            validation_data=None,
+            shuffle=True,
+            class_weight=None,
+            sample_weight=None,
+            return_best_model=True,
+            reduce_factor=.5,
+            **kwargs):
 
         # Check arguments
-        if extra_callbacks is None:
-            extra_callbacks = []
-        assert (validate >= 0)
+        assert (validation_split >= 0)
         assert epochs > 0
 
-        if self.classification:
-            stratify = y_data  # TODO: here you should select with which part to stratify
+        if validation_data:
+            x_train, y_train = x, y
+            x_valid, y_valid = validation_data
+
+        elif validation_split > 0:
+
+            if self.classification:
+                stratify = y
+            else:
+                stratify = None
+
+            if self.nb_inputs == 1:
+                x_train, x_valid = train_test_split(x, test_size=validation_split, stratify=stratify, random_state=5)
+            else:
+                stratify = None
+                x_train = [[] for _ in x]
+                x_valid = [[] for _ in x]
+                for i, x_d in enumerate(x):
+                    x_train[i], x_valid[i] = train_test_split(x_d, test_size=validation_split, stratify=stratify,
+                                                              random_state=5)
+            if self.nb_outputs == 1:
+                y_train, y_valid = train_test_split(y, test_size=validation_split, stratify=stratify, random_state=5)
+            else:
+                stratify = None
+                y_train = [[] for _ in y]
+                y_valid = [[] for _ in y]
+                for i, y_d in enumerate(y):
+                    y_train[i], y_valid[i] = train_test_split(y_d, test_size=validation_split, stratify=stratify,
+                                                              random_state=5)
+
         else:
-            stratify = None
+            x_train, y_train = x, y
+            x_valid, y_valid = [], []
 
-        if nb_inputs == 1:
-            x_train, x_valid = self._check_and_split_data(x_data, self.input, validate, stratify)
-        else:
-            stratify = None
-            x_train = [[] for _ in x_data]
-            x_valid = [[] for _ in x_data]
-            for i, x_d in enumerate(x_data):
-                x_train[i], x_valid[i] = self._check_and_split_data(x_d, self.network.inputs[i],
-                                                                    validate, stratify)
-        if nb_outputs == 1:
-            y_train, y_valid = self._check_and_split_data(y_data, self.output, validate, stratify)
-        else:
-            stratify = None
-            y_train = [[] for _ in y_data]
-            y_valid = [[] for _ in y_data]
-            for i, y_d in enumerate(y_data):
-                y_train[i], y_valid[i] = self._check_and_split_data(y_d, self.output[i], validate, stratify)
-
-        # Callbacks
-        es = EarlyStopping(monitor='val_loss',
-                           min_delta=0.0001,
-                           patience=patience,
-                           verbose=1,
-                           mode='min')
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss',
-                                      factor=reduce_factor,
-                                      patience=5,
-                                      min_lr=0.001,
-                                      verbose=1)
-        rn = np.random.random()
-        checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
-                                     monitor='val_loss',
-                                     verbose=1,
-                                     mode='min',
-                                     save_best_only=True,
-                                     save_weights_only=True)
-
-        callbacks = [es, reduce_lr, checkpoint]
-        if K.backend() == "tensorflow":
-            tb = TensorBoard()
-            callbacks.append(tb)
-
-        if self.classification:
-            # callbacks.append(ClassificationMetrics((x_valid, y_valid)))
-            callbacks.append(ClassificationMetrics())
+        if return_best_model:
+            rn = np.random.random()
+            checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
+                                         monitor='val_loss',
+                                         verbose=1,
+                                         mode='min',
+                                         save_best_only=True,
+                                         save_weights_only=True)
+            callbacks.append(checkpoint)
 
         start_time = time.time()
         try:
-            self.network.fit(x_train, y_train,
-                             validation_data=(x_valid, y_valid),
-                             shuffle=shuffle,
-                             epochs=epochs,
-                             batch_size=batch_size,
-                             callbacks=callbacks + extra_callbacks,
-                             verbose=verbose)
+            super(Model, self).fit(x=x_train, y=y_train,
+                                   batch_size=batch_size,
+                                   epochs=epochs,
+                                   initial_epoch=initial_epoch,
+                                   verbose=verbose,
+                                   callbacks=callbacks,
+                                   validation_data=(x_valid, y_valid),
+                                   shuffle=True,
+                                   class_weight=None,
+                                   sample_weight=None)
         except KeyboardInterrupt:
             pass
 
@@ -362,58 +344,49 @@ class DeepTrainer:
             except:
                 print('Unable to load best parameters, saving current model.')
 
-        self.history = self.network.history
+        self.history_list.append(self.history)
 
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
                                                                           time.time() - start_time))
 
         return x_valid, y_valid
 
-    def k_fold(self, x_data, y_data, epochs=1, num_folds=10, stratify=False):
-        raise NotImplementedError
-
-    def score(self, x_data, y_data, **options):
-        return self.network.evaluate(x_data, y_data, verbose=options.pop('verbose', 0), **options)
-
-    def score_generator(self, generator=None, batch_size=1, **options):
+    def evaluate_generator(self, generator=None, steps=None, batch_size=1, **options):
         if generator is None:
-            generator = self.generator
+            generator = self.generator(batch_size=batch_size, shuffle=False, **options)
 
-        if 'x_data' in options:
-            if self.nb_inputs == 1:
+        if steps is None:
+            if 'x_data' in options and self.nb_inputs == 1:
                 nb_samples = len(options.x_data)
-            else:
+            elif 'x_data' in options:
                 nb_samples = len(options.x_data[0])
-        else:
-            try:
+            elif 'nb_samples' in options:
                 nb_samples = options.pop('nb_samples')
-            except IndexError:
-                raise IndexError('Must give x_data or nb_samples argumnet')
+            else:
+                raise KeyError('Must give x_data or nb_samples argumnet')
 
-        return self.network.evaluate_generator(generator=generator(batch_size=batch_size, shuffle=False, **options),
-                                               steps=np.ceil(nb_samples / batch_size),
-                                               workers=1)
+            steps = np.ceil(nb_samples / batch_size)
 
-    def predict_proba(self, x_data):
-        return self.network.predict_proba(x_data)
+        return super(Model, self).evaluate_generator(generator=generator,
+                                                     steps=steps,
+                                                     max_q_size=10,
+                                                     workers=1,
+                                                     pickle_safe=False)
 
-    def predict_classes(self, x_data):
-        return self.network.predict_classes(x_data)
-
-    def predict(self, x_data):
-        return self.network.predict(x_data)
-
-    def predict_generator(self, x_data, generator=None, batch_size=1):
+    def predict_generator(self, x_data, generator=None, batch_size=1, **options):
         if generator is None:
-            generator = self.generator
+            generator = self.generator(x_data, batch_size=batch_size, shuffle=False)
 
         if self.nb_inputs == 1:
             nb_train_samples = len(x_data)
         else:
             nb_train_samples = len(x_data[0])
 
-        return self.network.predict_generator(generator=generator(x_data, batch_size=batch_size, shuffle=False),
-                                              steps=np.ceil(nb_train_samples / batch_size))
+        return super(Model, self).predict_generator(generator=generator,
+                                                    steps=np.ceil(nb_train_samples / batch_size),
+                                                    max_q_size=10,
+                                                    workers=1,
+                                                    pickle_safe=False)
 
     def display_network_info(self):
 
@@ -435,31 +408,31 @@ class DeepTrainer:
         print(tabulate(tabula, 'keys'))
 
     def get_all_layers(self):
-        return self.network.layers
+        return self.layers
 
     def get_all_params(self, trainable=True):
         if trainable:
-            return self.network.weights
+            return self.weights
         else:
-            return self.network.non_trainable_weights
+            return self.non_trainable_weights
 
     @property
     def n_params(self):
-        return self.network.count_params()
+        return self.count_params()
 
     def get_all_param_values(self):
-        return self.network.get_weights()
+        return self.get_weights()
 
     def set_all_param_values(self, weights):
         try:
-            self.network.set_weights(weights)
+            self.set_weights(weights)
         except Exception:
             msg = 'Incorrect parameter list'
             raise ValueError(msg)
 
     def load_all_param_values(self, filepath):
         try:
-            self.network.load_weights(filepath)
+            self.load_weights(filepath)
         except Exception:
             msg = 'Incorrect parameter list'
             raise ValueError(msg)
@@ -505,7 +478,7 @@ class DeepTrainer:
         # self.set_all_param_values(new)
         raise NotImplementedError
 
-    def save_model_to_file(self, handle):
+    def save(self, handle):
 
         handle.ftype = 'model'
         handle.epochs = len(self.history.epoch)
@@ -514,13 +487,14 @@ class DeepTrainer:
         if not os.path.exists('/'.join(filename.split('/')[:-1])):
             os.makedirs('/'.join(filename.split('/')[:-1]))
 
-        self.network.save(filename)
+        super(Model, self).save(filename, overwrite=True) # ToDO: removed to optimizer. CHECK!
 
         print('Model saved to: ' + filename)
 
-    def load_model_from_file(self, filename):
-        self.network = self.network.__class__.from_saved_model(filename)
-        self.history = self.network.history
+    @classmethod
+    def load_model_from_file(cls, filename):
+        raise NotImplementedError
+        return cls
 
     def save_train_history(self, handle):
         handle.ftype = 'history'
@@ -542,3 +516,20 @@ def inspect_inputs(i, node, fn):
 
 def inspect_outputs(i, node, fn):
     print(" output(s) value(s):", [output[0] for output in fn.outputs])
+
+
+# def load_model(file_path):
+#     """Loads a model saved via Evolutron's `save_model`.
+#
+#         # Arguments
+#             filepath: String, path to the saved model.
+#
+#         # Returns
+#             A compiled Evolutron model instance.
+#
+#         # Raises
+#             ImportError: if h5py is not available.
+#             ValueError: In case of an invalid savefile.
+#     """
+
+

@@ -17,12 +17,12 @@ import sys, os, h5py
 try:
     from evolutron.engine import DeepTrainer
     from evolutron.tools import load_dataset, Handle, shape
-    from evolutron.networks import custom_layers
+    from evolutron.templates import custom_layers
 except ImportError:
     sys.path.insert(0, os.path.abspath('..'))
     from evolutron.engine import DeepTrainer
     from evolutron.tools import load_dataset, Handle, shape
-    from evolutron.networks import custom_layers
+    from evolutron.templates import custom_layers
 
 
 class DeepEmbed(Model):
