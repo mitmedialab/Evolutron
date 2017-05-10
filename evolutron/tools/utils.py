@@ -129,7 +129,9 @@ class Handle(object):
 
         self.model = model
         self.ftype = ftype
-        self.dataset = data_id
+        self.data_id = data_id
+        if data_id == 'file':
+            self.data_id = kwargs['infile'].split('/')[-1].split('.')[0]
 
         self.n_convs = conv
         self.n_fc = fc
@@ -137,7 +139,7 @@ class Handle(object):
         self.filename = str(self).split('/')[-1]
 
     def __str__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.dataset,
+        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.data_id,
                                                         self.filters,
                                                         self.filter_size,
                                                         self.epochs,
@@ -147,7 +149,7 @@ class Handle(object):
                                                         self.n_fc)
 
     def __repr__(self):
-        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.dataset,
+        return '{0}/{1}_{2}_{3}_{4}_{7}_{5}.{6}'.format(self.data_id,
                                                         self.filters,
                                                         self.filter_size,
                                                         self.epochs,
