@@ -3,6 +3,8 @@ Evolutron
 A mini deep learning framework for protein evolution.
 
 ## Dependencies
+* [Keras](https://github.com/fchollet/keras)
+* [Tensorflow](https://github.com/tensorflow/)
 * [Theano](https://github.com/Theano/Theano)
 * [Lasagne](https://github.com/Lasagne/Lasagne)
 * Scikit-Learn
@@ -14,6 +16,8 @@ A mini deep learning framework for protein evolution.
 * CoHST
 * CoBind
 * Visualizations
+* DeepPPI
+* DeepSecS
 
 
 ## Test run
