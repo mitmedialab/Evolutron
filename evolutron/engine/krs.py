@@ -7,18 +7,146 @@ import time
 from collections import OrderedDict, defaultdict
 
 import numpy as np
+import h5py
+import json
+import warnings
 from tabulate import tabulate
 
 import keras
 import keras.backend as K
 import keras.optimizers as opt
+from keras.engine import topology
+from keras.layers import deserialize_keras_object
 from keras.callbacks import ModelCheckpoint
+
+from evolutron.tools import Handle
 
 from sklearn.model_selection import train_test_split
 
 if K.backend() == 'theano':
     from theano.compile.nanguardmode import NanGuardMode
     from theano.compile.monitormode import MonitorMode
+
+
+def load_model(filepath, custom_objects=None, compile=True):
+    """Loads an Evolutron model saved via Model.save().
+    # Arguments
+        filepath: String, path to the saved model.
+        custom_objects: Optional dictionary mapping names
+            (strings) to custom classes or functions to be
+            considered during deserialization.
+        compile: Boolean, whether to compile the model
+            after loading.
+    # Returns
+        An Evolutron model instance. If an optimizer was found
+        as part of the saved model, the model is already
+        compiled. Otherwise, the model is uncompiled and
+        a warning will be displayed. When `compile` is set
+        to False, the compilation is omitted without any
+        warning.
+    # Raises
+        ImportError: if h5py is not available.
+        ValueError: In case of an invalid savefile.
+    """
+    if h5py is None:
+        raise ImportError('`load_model` requires h5py.')
+
+    if not custom_objects:
+        custom_objects = {}
+
+    def convert_custom_objects(obj):
+        """Handles custom object lookup.
+        # Arguments
+            obj: object, dict, or list.
+        # Returns
+            The same structure, where occurences
+                of a custom object name have been replaced
+                with the custom object.
+        """
+        if isinstance(obj, list):
+            deserialized = []
+            for value in obj:
+                if value in custom_objects:
+                    deserialized.append(custom_objects[value])
+                else:
+                    deserialized.append(value)
+            return deserialized
+        if isinstance(obj, dict):
+            deserialized = {}
+            for key, value in obj.items():
+                deserialized[key] = []
+                if isinstance(value, list):
+                    for element in value:
+                        if element in custom_objects:
+                            deserialized[key].append(custom_objects[element])
+                        else:
+                            deserialized[key].append(element)
+                elif value in custom_objects:
+                    deserialized[key] = custom_objects[value]
+                else:
+                    deserialized[key] = value
+            return deserialized
+        if obj in custom_objects:
+            return custom_objects[obj]
+        return obj
+
+    f = h5py.File(filepath, mode='r')
+
+    # instantiate model
+    model_config = f.attrs.get('model_config')
+    if model_config is None:
+        raise ValueError('No model found in config file.')
+    model_config = json.loads(model_config.decode('utf-8'))
+
+    globs = globals()  # All layers.
+    globs['Model'] = Model
+    model = deserialize_keras_object(model_config,
+                                     module_objects=globs,
+                                     custom_objects=custom_objects,
+                                     printable_module_name='layer')
+    # set weights
+    topology.load_weights_from_hdf5_group(f['model_weights'], model.layers)
+
+    # Early return if compilation is not required.
+    if not compile:
+        f.close()
+        return model
+
+    # instantiate optimizer
+    training_config = f.attrs.get('training_config')
+    if training_config is None:
+        warnings.warn('No training configuration found in save file: '
+                      'the model was *not* compiled. Compile it manually.')
+        f.close()
+        return model
+    training_config = json.loads(training_config.decode('utf-8'))
+    optimizer_config = training_config['optimizer_config']
+    optimizer = opt.deserialize(optimizer_config,
+                                custom_objects=custom_objects)
+
+    # Recover loss functions and metrics.
+    loss = convert_custom_objects(training_config['loss'])
+    metrics = convert_custom_objects(training_config['metrics'])
+    sample_weight_mode = training_config['sample_weight_mode']
+    loss_weights = training_config['loss_weights']
+
+    # Compile model.
+    model.compile(optimizer=optimizer,
+                  loss=loss,
+                  metrics=metrics,
+                  loss_weights=loss_weights,
+                  sample_weight_mode=sample_weight_mode)
+
+    # Set optimizer weights.
+    if 'optimizer_weights' in f:
+        # Build train function (to get weight updates).
+        model._make_train_function()
+        optimizer_weights_group = f['optimizer_weights']
+        optimizer_weight_names = [n.decode('utf8') for n in optimizer_weights_group.attrs['weight_names']]
+        optimizer_weight_values = [optimizer_weights_group[n] for n in optimizer_weight_names]
+        model.optimizer.set_weights(optimizer_weight_values)
+    f.close()
+    return model
 
 
 class Model(keras.models.Model):
@@ -53,18 +181,20 @@ class Model(keras.models.Model):
     def compile(self, optimizer, loss, metrics=None, loss_weights=None,
                 sample_weight_mode=None, **options):
 
-        opts = {'sgd': opt.SGD(lr=options.get('lr', .01),
-                               decay=options.get('decay', 1e-6),
-                               momentum=options.get('momentum', 0.9), nesterov=True,
-                               clipnorm=options.get('clipnorm', 0)),
-                'rmsprop': opt.RMSprop(lr=options.get('lr', .001)),
-                'adadelta': opt.Adadelta(lr=options.get('lr', 1.)),
-                'adagrad': opt.Adagrad(lr=options.get('lr', .01)),
-                'adam': opt.Adam(lr=options.get('lr', .001)),
-                'nadam': opt.Nadam(lr=options.get('lr', .002),
+        if isinstance(optimizer, str):
+            opts = {'sgd': opt.SGD(lr=options.get('lr', .01),
+                                   decay=options.get('decay', 1e-6),
+                                   momentum=options.get('momentum', 0.9), nesterov=True,
                                    clipnorm=options.get('clipnorm', 0)),
-                'adamax': opt.Adamax(lr=options.get('lr', .002))
-                }
+                    'rmsprop': opt.RMSprop(lr=options.get('lr', .001)),
+                    'adadelta': opt.Adadelta(lr=options.get('lr', 1.)),
+                    'adagrad': opt.Adagrad(lr=options.get('lr', .01)),
+                    'adam': opt.Adam(lr=options.get('lr', .001)),
+                    'nadam': opt.Nadam(lr=options.get('lr', .002),
+                                       clipnorm=options.get('clipnorm', 0)),
+                    'adamax': opt.Adamax(lr=options.get('lr', .002))
+                    }
+            optimizer = opts[optimizer]
 
         mode = options.get('mode', None)
         if K.backend() == 'theano' and mode:
@@ -75,14 +205,14 @@ class Model(keras.models.Model):
 
             super(Model, self).compile(loss=loss,
                                        loss_weights=loss_weights,
-                                       optimizer=opts[optimizer],
+                                       optimizer=optimizer,
                                        metrics=metrics,
                                        sample_weight_mode=sample_weight_mode,
                                        mode=mode)
         else:
             super(Model, self).compile(loss=loss,
                                        loss_weights=loss_weights,
-                                       optimizer=opts[optimizer],
+                                       optimizer=optimizer,
                                        sample_weight_mode=sample_weight_mode,
                                        metrics=metrics)
 
@@ -478,23 +608,20 @@ class Model(keras.models.Model):
         # self.set_all_param_values(new)
         raise NotImplementedError
 
-    def save(self, handle):
+    def save(self, handle, **save_args):
 
-        handle.ftype = 'model'
-        handle.epochs = len(self.history.epoch)
+        if isinstance(handle, Handle):
+            handle.ftype = 'model'
+            handle.epochs = len(self.history.epoch)
+            filename = 'models/' + handle
+            if not os.path.exists('/'.join(filename.split('/')[:-1])):
+                os.makedirs('/'.join(filename.split('/')[:-1]))
+        else:
+            filename = handle
 
-        filename = 'models/' + handle
-        if not os.path.exists('/'.join(filename.split('/')[:-1])):
-            os.makedirs('/'.join(filename.split('/')[:-1]))
-
-        super(Model, self).save(filename, overwrite=True) # ToDO: removed to optimizer. CHECK!
+        super(Model, self).save(filename, **save_args)
 
         print('Model saved to: ' + filename)
-
-    @classmethod
-    def load_model_from_file(cls, filename):
-        raise NotImplementedError
-        return cls
 
     def save_train_history(self, handle):
         handle.ftype = 'history'
@@ -516,20 +643,3 @@ def inspect_inputs(i, node, fn):
 
 def inspect_outputs(i, node, fn):
     print(" output(s) value(s):", [output[0] for output in fn.outputs])
-
-
-# def load_model(file_path):
-#     """Loads a model saved via Evolutron's `save_model`.
-#
-#         # Arguments
-#             filepath: String, path to the saved model.
-#
-#         # Returns
-#             A compiled Evolutron model instance.
-#
-#         # Raises
-#             ImportError: if h5py is not available.
-#             ValueError: In case of an invalid savefile.
-#     """
-
-
