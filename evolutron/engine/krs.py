@@ -241,29 +241,37 @@ class Model(keras.models.Model):
         assert (validation_split >= 0)
         assert epochs > 0
 
-        if self.classification:
-            stratify = y_data  # TODO: here you should select with which part to stratify
-        else:
-            stratify = None
+        if validation_data is None:
+            if self.classification:
+                stratify = y_data  # TODO: here you should select with which part to stratify
+            else:
+                stratify = None
 
-        if self.nb_inputs == 1:
-            x_train, x_valid = train_test_split(x_data, self.input, test_size=validation_split, stratify=stratify)
+            if self.nb_inputs == 1:
+                x_train, x_valid = train_test_split(x_data, test_size=validation_split, stratify=stratify,
+                                                    random_state=5)
+            else:
+                stratify = None
+                x_train = [[] for _ in x_data]
+                x_valid = [[] for _ in x_data]
+                for i, x_d in enumerate(x_data):
+                    x_train[i], x_valid[i] = train_test_split(x_d, test_size=validation_split, stratify=stratify,
+                                                              random_state=5)
+            if self.nb_outputs == 1:
+                y_train, y_valid = train_test_split(y_data, test_size=validation_split, stratify=stratify,
+                                                    random_state=5)
+            else:
+                stratify = None
+                y_train = [[] for _ in y_data]
+                y_valid = [[] for _ in y_data]
+                for i, y_d in enumerate(y_data):
+                    y_train[i], y_valid[i] = train_test_split(y_d, test_size=validation_split, stratify=stratify,
+                                                              random_state=5)
         else:
-            stratify = None
-            x_train = [[] for _ in x_data]
-            x_valid = [[] for _ in x_data]
-            for i, x_d in enumerate(x_data):
-                x_train[i], x_valid[i] = train_test_split(x_d, self.inputs[i], test_size=validation_split,
-                                                          stratify=stratify)
-        if self.nb_outputs == 1:
-            y_train, y_valid = train_test_split(y_data, self.output, test_size=validation_split, stratify=stratify)
-        else:
-            stratify = None
-            y_train = [[] for _ in y_data]
-            y_valid = [[] for _ in y_data]
-            for i, y_d in enumerate(y_data):
-                y_train[i], y_valid[i] = train_test_split(y_d, self.output[i], test_size=validation_split,
-                                                          stratify=stratify)
+            x_train = x_data
+            y_train = y_data
+            x_valid = validation_data[0]
+            y_valid = validation_data[1]
 
         if self.nb_inputs == 1:
             nb_train_samples = len(x_train)
@@ -317,19 +325,22 @@ class Model(keras.models.Model):
 
         return x_valid, y_valid
 
-    def fit_generator_from_file(self, file, nb_samples,
+    def fit_generator_from_file(self, nb_samples=None,
                                 generator=None,
+                                steps_per_epoch=None,
                                 epochs=1,
                                 verbose=1,
                                 callbacks=None,
                                 validation_data=None,
+                                validation_steps=None,
                                 validation_split=.0,
                                 class_weight=None,
                                 max_q_size=10,
                                 workers=1,
-                                pickle_safe=False,
+                                use_multiprocessing=False,
                                 initial_epoch=0,
-                                batch_size=64, shuffle=True,
+                                batch_size=64,
+                                shuffle=True,
                                 return_best_model=True,
                                 monitor='val_loss',
                                 **generator_options):
@@ -341,12 +352,24 @@ class Model(keras.models.Model):
         assert (validation_split >= 0)
         assert epochs > 0
 
-        nb_train_samples = int(nb_samples * (1 - validation_split))
-        nb_val_samples = nb_samples - nb_train_samples
+        if steps_per_epoch is None:
+            nb_train_samples = int(nb_samples * (1 - validation_split))
+            steps_per_epoch = np.ceil(nb_train_samples / batch_size)
+        if validation_steps is None:
+            nb_val_samples = nb_samples - nb_train_samples
+            validation_steps = np.ceil(nb_val_samples / batch_size)
 
+        if callable(generator):
+            generator = generator(batch_size=batch_size, **generator_options)
+
+        if validation_data is None:
+            validation_data = generator
+
+        """
         index_array = np.arange(nb_samples, dtype=np.int32)
         if shuffle == 'shuffle':
             np.random.shuffle(index_array)
+        """
 
         if return_best_model:
             rn = np.random.random()
@@ -358,21 +381,23 @@ class Model(keras.models.Model):
                                          save_weights_only=True)
             callbacks.append(checkpoint)
 
+        for cb in callbacks:
+            cb.validation_data = validation_data
+
         start_time = time.time()
         try:
-            super(Model, self).fit_generator(generator=generator(file, batch_size=batch_size, **generator_options),
-                                             steps_per_epoch=np.ceil(nb_train_samples / batch_size),
+            super(Model, self).fit_generator(generator=generator,
+                                             steps_per_epoch=steps_per_epoch,
                                              epochs=epochs,
                                              verbose=verbose,
                                              callbacks=callbacks,
-                                             validation_data=generator(file, batch_size=batch_size,
-                                                                       **generator_options),
-                                             validation_steps=np.ceil(nb_val_samples / batch_size),
+                                             validation_data=validation_data,
+                                             validation_steps=validation_steps,
                                              workers=workers,
                                              max_q_size=max_q_size,
                                              initial_epoch=initial_epoch,
                                              class_weight=class_weight,
-                                             pickle_safe=pickle_safe)
+                                             use_multiprocessing=use_multiprocessing)
 
         except KeyboardInterrupt:
             return
@@ -487,13 +512,13 @@ class Model(keras.models.Model):
 
         if steps is None:
             if 'x_data' in options and self.nb_inputs == 1:
-                nb_samples = len(options.x_data)
+                nb_samples = len(options['x_data'])
             elif 'x_data' in options:
-                nb_samples = len(options.x_data[0])
+                nb_samples = len(options['x_data'][0])
             elif 'nb_samples' in options:
                 nb_samples = options.pop('nb_samples')
             else:
-                raise KeyError('Must give x_data or nb_samples argumnet')
+                raise KeyError('Must give x_data or nb_samples argument')
 
             steps = np.ceil(nb_samples / batch_size)
 
