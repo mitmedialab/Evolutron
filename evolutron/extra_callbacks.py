@@ -20,7 +20,7 @@ class PrecisionCallback(Callback):
 
 class AucCallback(Callback):
     def on_train_begin(self, logs=None):
-        self.prfs = []
+        self.auc = []
 
     def on_epoch_end(self, epoch, logs=None):
         if self.model.generator is None:
@@ -31,9 +31,10 @@ class AucCallback(Callback):
             else:
                 nb_samples = len(self.validation_data[0][0])
 
-            y_pred = self.model.predict_generator(self.model.generator(self.validation_data[0], batch_size=50),
+            y_pred = self.model.predict_generator(self.validation_data[0],
                                                   steps=np.ceil(nb_samples / 50))
 
-        self.prfs.append(roc_auc_score(y_true=self.validation_data[1].astype(np.bool), y_score=y_pred))
-        print('AUC Score is %s' % self.prfs[-1])
+        roc_auc = roc_auc_score(y_true=self.validation_data[1].astype(np.bool), y_score=y_pred)
+        self.auc.append(roc_auc)
+        print('AUC Score is %s' % self.auc[-1])
         print('random')
