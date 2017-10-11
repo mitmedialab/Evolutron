@@ -383,6 +383,7 @@ class Model(keras.models.Model):
 
         for cb in callbacks:
             cb.validation_data = validation_data
+            cb.validation_steps = validation_steps
 
         start_time = time.time()
         try:
@@ -523,22 +524,22 @@ class Model(keras.models.Model):
             steps = np.ceil(nb_samples / batch_size)
 
         return super(Model, self).evaluate_generator(generator=generator,
-                                                     steps=steps,
-                                                     max_q_size=10,
-                                                     workers=1,
-                                                     pickle_safe=False)
+                                                     steps=steps)
 
-    def predict_generator(self, x_data, generator=None, batch_size=1, **options):
+    def predict_generator(self, x_data=None, generator=None, steps=None, batch_size=1, **options):
         if generator is None:
             generator = self.generator(x_data, batch_size=batch_size, shuffle=False)
 
-        if self.nb_inputs == 1:
-            nb_train_samples = len(x_data)
+            if self.nb_inputs == 1:
+                nb_train_samples = len(x_data)
+            else:
+                nb_train_samples = len(x_data[0])
+            steps = np.ceil(nb_train_samples / batch_size)
         else:
-            nb_train_samples = len(x_data[0])
+            assert steps is not None
 
         return super(Model, self).predict_generator(generator=generator,
-                                                    steps=np.ceil(nb_train_samples / batch_size),
+                                                    steps=steps,
                                                     max_q_size=10,
                                                     workers=1,
                                                     pickle_safe=False)
