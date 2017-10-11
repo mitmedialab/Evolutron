@@ -115,3 +115,8 @@ def fmeasure_loss(y_true, y_pred):
     recall_value = recall_loss(y_true, y_pred)
 
     return ((Beta ** 2 + 1) * precision_value * recall_value) / (Beta ** 2 * precision_value + recall_value)
+
+
+def focal_loss(alpha=.5, gamma=1):
+    return lambda y_true, y_pred: K.mean(-1*alpha*y_true*K.pow(1-y_pred, gamma)*K.log(y_pred) -
+                                         (1-alpha)*(1-y_true)*K.pow(y_pred, gamma)*K.log(1-y_pred), axis=-1)

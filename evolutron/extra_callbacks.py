@@ -1,6 +1,8 @@
 import numpy as np
+from typing import Generator
 
 from keras.callbacks import Callback
+from keras.utils import GeneratorEnqueuer
 from sklearn.metrics import precision_score, roc_auc_score
 
 
@@ -26,15 +28,51 @@ class AucCallback(Callback):
         if self.model.generator is None:
             y_pred = self.model.predict(self.validation_data[0])
         else:
-            if len(self.model.inputs) == 1:
-                nb_samples = len(self.validation_data[0])
+            if isinstance(self.validation_data, Generator):
+                y_pred = []
+                y_true = []
+
+                enqueuer = GeneratorEnqueuer(self.validation_data,
+                                             use_multiprocessing=False,
+                                             wait_time=.01)
+                enqueuer.start(workers=1, max_queue_size=10)
+                output_generator = enqueuer.get()
+
+                for _ in range(self.validation_steps):
+                    generator_output = next(output_generator)
+                    if not hasattr(generator_output, '__len__'):
+                        raise ValueError('Output of generator should be a tuple '
+                                         '(x, y, sample_weight) '
+                                         'or (x, y). Found: ' +
+                                         str(generator_output))
+                    if len(generator_output) == 2:
+                        x, y = generator_output
+                    elif len(generator_output) == 3:
+                        x, y, _ = generator_output
+                    else:
+                        raise ValueError('Output of generator should be a tuple '
+                                         '(x, y, sample_weight) '
+                                         'or (x, y). Found: ' +
+                                         str(generator_output))
+                    outs = self.model.predict_on_batch(x)
+
+                    y_pred += outs.tolist()
+                    y_true += y.tolist()
+
+                enqueuer.stop()
             else:
-                nb_samples = len(self.validation_data[0][0])
+                # validation_data = self.validation_data[0]
 
-            y_pred = self.model.predict_generator(self.validation_data[0],
-                                                  steps=np.ceil(nb_samples / 50))
+                # if len(self.model.inputs) == 1:
+                #     nb_samples = len(self.validation_data[0])
+                # else:
+                #     nb_samples = len(self.validation_data[0][0])
+                # steps = np.ceil(nb_samples / 50)
 
-        roc_auc = roc_auc_score(y_true=self.validation_data[1].astype(np.bool), y_score=y_pred)
+                y_pred = self.model.predict(self.validation_data[0])
+                y_true = self.validation_data[1].astype(np.bool)
+
+        roc_auc = roc_auc_score(y_true=y_true, y_score=y_pred)
         self.auc.append(roc_auc)
         print('AUC Score is %s' % self.auc[-1])
         print('random')
