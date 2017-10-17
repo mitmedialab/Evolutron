@@ -2,13 +2,7 @@
 """
     Define the tools top level
 """
-from .data_tools import data_it, load_dataset, file_db, pad_or_clip_seq
-
-from .seq_tools import (hot2aa, aa2hot, nt2prob, prob2nt,
-                        aa_map, aa_map_rev, nt_map)
-
-from .utils import (shape, none2str, probability, get_args, nested_to_categorical, nested_unique, Handle)
-
-from .visual import (plot_loss_history)
+from .data_tools import data_it, load_dataset, pad_or_clip_seq
+from .seq_tools import aa2hot, aa_map, aa_map_rev, hot2aa, nt2prob, nt_map, prob2nt
 from .structure_tools import *
-
+from .utils import Handle, get_args, nested_to_categorical, nested_unique, none2str, probability, shape

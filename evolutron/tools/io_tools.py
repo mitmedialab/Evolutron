@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from .seq_tools import aa_map, nt_map, aa2hot, secs2hot, aa2codon, hot2aa
+from .seq_tools import aa2codon, aa_map, hot2aa, nt_map, secs2hot
 from .utils import ZincFinger
 
 
@@ -199,7 +199,9 @@ def csv_parser(filename, codes=False, code_key=None, sep='\t'):
 
     if codes:
         if type(code_key) == str:
-            pos_data = raw_data[raw_data[code_key] != 'Unassigned']
+            code_vc = raw_data[code_key].value_counts()
+            pos_data = raw_data[raw_data[code_key] != 'Unassigned'][
+                ~raw_data[code_key].isin(code_vc[code_vc == 1].index.tolist())]
             code_cats = pos_data[code_key].astype('category').cat.codes
             y_data = code_cats.tolist()
             y_data = [y + 1 for y in y_data]

@@ -1,9 +1,5 @@
 import numpy as np
-import pandas as pd
-from biopandas.pdb import PandasPdb
-import time
 from scipy.spatial.distance import pdist, squareform
-
 
 elements_map = {'H': 0,
                 'C': 1,
@@ -53,7 +49,7 @@ def PDBdf2linearArray(atoms, size=np.Inf):
     coords = np.stack([x_coord, y_coord, z_coord], axis=-1)
 
     atom_type = np.apply_along_axis(one_hot_elements_map, -1, np.expand_dims(atoms.element_symbol.values, axis=-1))
-        # np.vectorize(one_hot_elements_map)(atoms.element_symbol.values)
+    # np.vectorize(one_hot_elements_map)(atoms.element_symbol.values)
 
     distances = squareform(pdist(coords))
     distances.partition(distances.shape[-1] - 4, axis=-1)
@@ -71,9 +67,10 @@ def rotatePDBdf(df, angles):
     sin = np.sin(angles)
 
     # Rotation matrix
-    R = np.array([[cos[1]*cos[2], cos[2]*sin[0]*sin[1]-cos[0]*sin[2], cos[0]*cos[2]*sin[1]+sin[0]*sin[2]],
-                  [cos[1]*sin[2], cos[0]*cos[2]+sin[0]*sin[1]*sin[2], -cos[2]*sin[0]+cos[0]*sin[1]*sin[2]],
-                  [-sin[1], cos[1]*sin[0], cos[0]*cos[1]]])
+    R = np.array(
+            [[cos[1] * cos[2], cos[2] * sin[0] * sin[1] - cos[0] * sin[2], cos[0] * cos[2] * sin[1] + sin[0] * sin[2]],
+             [cos[1] * sin[2], cos[0] * cos[2] + sin[0] * sin[1] * sin[2], -cos[2] * sin[0] + cos[0] * sin[1] * sin[2]],
+             [-sin[1], cos[1] * sin[0], cos[0] * cos[1]]])
 
     M = np.array([df.x_coord.values, df.y_coord.values, df.z_coord.values])
 
@@ -93,9 +90,10 @@ def rotateArray(arr, angles):
     sin = np.sin(angles)
 
     # Rotation matrix
-    R = np.array([[cos[1]*cos[2], cos[2]*sin[0]*sin[1]-cos[0]*sin[2], cos[0]*cos[2]*sin[1]+sin[0]*sin[2]],
-                  [cos[1]*sin[2], cos[0]*cos[2]+sin[0]*sin[1]*sin[2], -cos[2]*sin[0]+cos[0]*sin[1]*sin[2]],
-                  [-sin[1], cos[1]*sin[0], cos[0]*cos[1]]])
+    R = np.array(
+            [[cos[1] * cos[2], cos[2] * sin[0] * sin[1] - cos[0] * sin[2], cos[0] * cos[2] * sin[1] + sin[0] * sin[2]],
+             [cos[1] * sin[2], cos[0] * cos[2] + sin[0] * sin[1] * sin[2], -cos[2] * sin[0] + cos[0] * sin[1] * sin[2]],
+             [-sin[1], cos[1] * sin[0], cos[0] * cos[1]]])
 
     M = arr[:, :3]
 

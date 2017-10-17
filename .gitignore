@@ -1,11 +1,5 @@
 .ipynb_checkpoints/
 .DS_store
-logs/
-datasets/
-motifs/
-vaildregion.seq.test
-vaildregion.seq.train
-vaildregion.seq.valid
 
 # Pycharm specific
 .idea/
@@ -68,3 +62,5 @@ docs/_build/
 
 # PyBuilder
 target/
+docs/_static/
+docs/_templates/
