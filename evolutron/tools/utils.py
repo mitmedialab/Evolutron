@@ -1,10 +1,10 @@
 # coding=utf-8
 import numpy as np
 
+
 ##############################
 # -------- Functions ------- #
 ##############################
-
 
 def get_args(kwargs, args):
     return {k: kwargs.pop(k) for k in args if k in kwargs}
@@ -75,6 +75,7 @@ def nested_unique(arr):
 
     return np.unique(flat)
 
+
 ############################
 # -------- Classes ------- #
 ############################
@@ -119,7 +120,7 @@ class Handle(object):
                  filter_length=None,
                  model=None,
                  ftype=None,
-                 data_id=None,
+                 infile=None,
                  conv=None,
                  fc=None,
                  **kwargs):
@@ -129,9 +130,7 @@ class Handle(object):
 
         self.model = model
         self.ftype = ftype
-        self.data_id = data_id
-        if data_id == 'file':
-            self.data_id = kwargs['infile'].split('/')[-1].split('.')[0]
+        self.data_id = infile.split('/')[-1].split('.')[0]
 
         self.n_convs = conv
         self.n_fc = fc

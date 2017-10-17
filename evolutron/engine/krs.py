@@ -477,6 +477,7 @@ class Model(keras.models.Model):
                                          mode='min',
                                          save_best_only=True,
                                          save_weights_only=True)
+            # TODO: this is multiply defined, define only once per fit
             callbacks.append(checkpoint)
 
         start_time = time.time()

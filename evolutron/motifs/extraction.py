@@ -4,12 +4,12 @@ from __future__ import print_function
 
 import os
 import shutil
-import numpy as np
 
+import numpy as np
 import weblogolib as wl
 from corebio.seq_io import SeqList
 
-from evolutron.tools import hot2aa, data_it
+from evolutron.tools import data_it, hot2aa
 
 
 def make_pfm(layer_weights):
@@ -52,7 +52,7 @@ def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth, mul
 
     # Calculate the activations for each filter for each protein in data set
     max_seq_scores = []
-    for x_part in data_it(x_data, 1000, multidata=multiinput):
+    for x_part in data_it(x_data, 1000, multi_data=multiinput):
         if multiinput:
             seq_scores = np.squeeze(motif_fun(x_part), 0)
         else:
