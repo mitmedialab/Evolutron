@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot
+from evolutron.tools.seq_tools import aa_map, nt_map, aa2hot, SecS2hot
 
 
 ############################
@@ -231,5 +231,32 @@ def tab_parser(filename, dummy_option=None):
         raw_data.to_hdf(filename.split('.')[0] + '.h5', 'raw_data')
 
     x_data = raw_data.sequence.apply(aa2hot).sample(frac=1).reset_index(drop=True).tolist()
+
+    return x_data, None
+
+def SecS_parser(filename, dummy_option=None):
+    """
+        This module parses data from files containing sequence and secondary structure and transforms them to Evolutron format.
+    """
+
+    input_file = open(filename, "rU")
+
+    aa_list = []
+    SecS_list = []
+    flag = True
+    for record in SeqIO.parse(input_file, "fasta"):
+        if flag:
+            seq = str(record.seq)
+            aa_list.append(seq)
+
+            flag = False
+        else:
+            sec = str(record.seq)
+            SecS_list.append(sec)
+
+            flag = True
+
+    x_data = list(map(aa2hot, aa_list))
+    y_data = list(map(SecS2hot, SecS_list))
 
     return x_data, None

@@ -26,6 +26,8 @@ aa_map = {
     'D': 17,
     'S': 18,
     'T': 19,
+    'U': 20,
+    'O': 21,
 }
 
 aa_map_rev = {
@@ -48,7 +50,33 @@ aa_map_rev = {
     16: 'E',
     17: 'D',
     18: 'S',
-    19: 'T'
+    19: 'T',
+    20: 'U',
+    21: 'O',
+}
+
+SecS_map = {
+    ' ': 0,
+    'L': 0,
+    'C': 0,
+    'H': 1,
+    'G': 2,
+    'T': 3,
+    'S': 4,
+    'B': 5,
+    'E': 6,
+    'I': 7,
+}
+
+SecS_map_rev = {
+    0: 'C',
+    1: 'H',
+    2: 'G',
+    3: 'T',
+    4: 'S',
+    5: 'B',
+    6: 'E',
+    7: 'I',
 }
 
 nt_map = {
@@ -94,15 +122,46 @@ Transformations between representations
 #     return [np.argmax(h) for h in hot.T]
 
 
-def aa2hot(aa_seq):
+"""def aa2hot(aa_seq):
     num = [aa_map[aa] for aa in aa_seq]
-    return np.eye(20, dtype=np.float32)[num]
 
+    return np.eye(23, dtype=np.float32)[num]"""
+
+def aa2hot(aa_seq):
+    hot = np.zeros(shape=(len(aa_seq), 22))
+    for idx in range(len(aa_seq)):
+        try:
+            hot[idx, aa_map[aa_seq[idx]]] = 1
+        except:
+            if aa_seq[idx] == 'X':
+                hot[idx,:] = [1/22 for _ in range(22)]
+            elif aa_seq[idx] == 'B':
+                hot[idx, aa_map['D']] = .5
+                hot[idx, aa_map['N']] = .5
+            elif aa_seq[idx] == 'Z':
+                hot[idx, aa_map['E']] = .5
+                hot[idx, aa_map['Q']] = .5
+            elif aa_seq[idx] == 'J':
+                hot[idx, aa_map['I']] = .5
+                hot[idx, aa_map['L']] = .5
+
+    return hot
 
 def hot2aa(hot):
     num = [np.argmax(h) for h in hot]
 
     return ''.join([aa_map_rev[n] for n in num])
+
+
+def SecS2hot(sec_seq):
+    num = [SecS_map[s] for s in sec_seq]
+    return np.eye(8, dtype=np.float32)[num]
+
+
+def hot2SecS(hot):
+    num = [np.argmax(h) for h in hot]
+
+    return ''.join([SecS_map_rev[n] for n in num])
 
 
 def nt2prob(seq):
