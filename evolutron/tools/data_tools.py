@@ -12,7 +12,8 @@ file_db = {
     'zinc': 'sprot_znf_prot_pfam.tsv',
     'homeo': 'sprot_homeo_pfam.tsv',
     'cd4': 'sprot_cd4_pfam.tsv',
-    'dnabind': 'sprot_dna_tf_pfam.tsv'
+    'dnabind': 'sprot_dna_tf_pfam.tsv',
+    'SecS': 'SecS.txt'
 }
 
 
@@ -46,6 +47,8 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
         x_data, y_data = io.tab_parser('datasets/' + filename, **parser_options)
     elif filetype == 'fasta':
         x_data, y_data = io.fasta_parser('datasets/' + filename, **parser_options)
+    elif filetype == 'txt':
+        x_data, y_data = io.SecS_parser('datasets/' + filename, **parser_options)
     else:
         raise NotImplementedError('There is no parser for current file type.')
 
@@ -56,6 +59,10 @@ def load_dataset(data_id, padded=True, min_aa=None, max_aa=None, **parser_option
             max_aa = min(max_aa, np.max([len(x) for x in x_data]))
 
         x_data = np.asarray([pad_or_clip(x, max_aa) for x in x_data])
+        try:
+            y_data = np.asarray([pad_or_clip(y, max_aa) for y in y_data])
+        except:
+            pass
 
     if not y_data:
         # Unsupervised Learning
