@@ -1,8 +1,4 @@
-datasets/
-motifs/
-vaildregion.seq.test
-vaildregion.seq.train
-vaildregion.seq.valid
+.ipynb_checkpoints/
 
 # Pycharm specific
 .idea/

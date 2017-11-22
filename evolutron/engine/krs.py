@@ -7,7 +7,7 @@ from collections import OrderedDict, defaultdict
 
 import numpy as np
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
-from keras.optimizers import SGD
+import keras.optimizers as opt
 from sklearn.model_selection import train_test_split, KFold, StratifiedKFold
 from tabulate import tabulate
 
@@ -46,12 +46,19 @@ class DeepTrainer:
 
     def compile(self, optimizer, **options):
 
-        if optimizer == 'sgd':
-            optimizer = SGD(lr=options.pop('lr', .01),
-                            decay=1e-6, momentum=0.9, nesterov=True)
+        opts = {'sgd': opt.SGD(lr=options.pop('lr', .01),
+                               decay=options.pop('decay', 1e-6),
+                               momentum=options.pop('momentum', 0.9), nesterov=True),
+                'rmsprop': opt.RMSprop(lr=options.pop('lr', .001)),
+                'adadelta': opt.Adadelta(lr=options.pop('lr', 1.)),
+                'adagrad': opt.Adagrad(lr=options.pop('lr', .01)),
+                'adam': opt.Adam(lr=options.pop('lr', .001)),
+                'nadam': opt.Nadam(lr=options.pop('lr', .002)),
+                'adamax': opt.Adamax(lr=options.pop('lr', .002))
+                }
 
         self.network.compile(loss=self.network._loss_function,
-                             optimizer=optimizer,
+                             optimizer=opts[optimizer],
                              metrics=[self.network.mean_cat_acc])
         self._create_functions()
 
@@ -104,13 +111,16 @@ class DeepTrainer:
                                      save_best_only=True, save_weights_only=True)
 
         start_time = time.time()
-        self.network.fit(x_train, y_train,
-                         validation_data=(x_valid, y_valid),
-                         shuffle=shuffle,
-                         nb_epoch=nb_epoch,
-                         batch_size=batch_size,
-                         callbacks=[es, reduce_lr, checkpoint]
-                         )
+        try:
+            self.network.fit(x_train, y_train,
+                             validation_data=(x_valid, y_valid),
+                             shuffle=shuffle,
+                             nb_epoch=nb_epoch,
+                             batch_size=batch_size,
+                             callbacks=[es, reduce_lr, checkpoint],
+                             verbose=1)
+        except KeyboardInterrupt:
+            pass
 
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(nb_epoch, time.time() - start_time))
         if return_best_model:
@@ -244,13 +254,13 @@ class DeepTrainer:
             self.reset_all_param_values()
 
     def score(self, x_data, y_data, **options):
-        raise self.network.evaluate(x_data, y_data, **options)
+        return self.network.evaluate(x_data, y_data, verbose=options.pop('verbose', 0), **options)
 
     def predict_proba(self, x_data):
-        raise self.network.predict_proba(x_data)
+        return self.network.predict_proba(x_data)
 
     def predict_classes(self, x_data):
-        raise self.network.predict_classes(x_data)
+        return self.network.predict_classes(x_data)
 
     def predict(self, x_data):
         return self.network.predict(x_data)
@@ -267,11 +277,11 @@ class DeepTrainer:
 
         shapes = ['x'.join(map(str, layer.output_shape[1:])) for layer in layers]
 
-        tabula = OrderedDict([('#', ids), ('Name', names), ('Shape', shapes)])
+        params = [layer.count_params() for layer in layers]
+
+        tabula = OrderedDict([('#', ids), ('Name', names), ('Shape', shapes), ('Parameters', params)])
 
         print(tabulate(tabula, 'keys'))
-
-        self.network.summary()
 
     def get_all_layers(self):
         return self.network.layers
