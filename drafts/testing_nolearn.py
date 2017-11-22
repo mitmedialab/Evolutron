@@ -9,7 +9,7 @@ from nolearn.lasagne import NeuralNet
 
 from evolutron.tools import load_dataset
 from evolutron.tools.io_tools import type2p
-from evolutron.trainers.thn import build_network_type2p as bdd
+from evolutron.engine.las import build_network_type2p as bdd
 
 print("Loading data...")
 raw_data = type2p(padded=True)

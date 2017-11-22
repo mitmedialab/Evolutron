@@ -11,7 +11,7 @@ import theano
 import theano.tensor as ten
 
 import evolutron.tools.io_tools as parse
-import evolutron.trainers.thn as nets
+import evolutron.engine.las as nets
 from evolutron.tools import load_dataset, num2aa, hot2num
 
 

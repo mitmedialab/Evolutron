@@ -11,33 +11,26 @@
     provided as is; no warranty is provided, and users accept all
     liability.
 """
-from keras.layers import Input, Convolution1D, MaxPooling1D, Dense, Flatten, Reshape, UpSampling1D, Dropout
-from keras.models import Model, load_model
-from keras.objectives import categorical_crossentropy, mean_squared_error
-from keras.metrics import categorical_accuracy
-
 import keras.backend as K
+from keras.layers import Input
+from keras.layers import Masking
+from keras.metrics import categorical_accuracy
+from keras.models import Model, load_model
+from keras.objectives import mean_squared_error
+
+from .extra_layers import Convolution1D, MaxPooling1D, Dense, Flatten, Reshape  # To implement masking
+from .extra_layers import Dedense, Unpooling1D, Deconvolution1D
 
 
 class DeepCoDER(Model):
     def __init__(self, input, output, name=None):
         super(DeepCoDER, self).__init__(input, output, name)
 
-        convs = [l for l in self.layers if l.name.find('Conv') == 0]
-
-        deconvs = [l for l in self.layers if l.name.find('Deconv') == 0]
-
-        deconvs = deconvs[::-1]
-
-        for c, d in zip(convs, deconvs):
-            d.W = c.W.transpose((0, 1, 3, 2))
-            d.b = c.b
-
     @classmethod
     def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
         args = cls._build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length)
 
-        args['name'] = 'dtkrCoDER'
+        args['name'] = 'krswDeepCoDER'
 
         return cls(**args)
 
@@ -52,239 +45,97 @@ class DeepCoDER(Model):
         super(DeepCoDER, self).save(filepath, overwrite=overwrite)
 
     @staticmethod
-    def _build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length):
-        inp = Input(shape=(aa_length, 20), name='aa_seq')  # Assuming tf dimension ordering
+    def _build_network(input_shape, n_conv_layers, n_fc_layers, nb_filter, filter_length):
+        assert len(input_shape) == 2, 'Unrecognizable input dimensions'
+        assert K.image_dim_ordering() == 'tf', 'Theano dimension ordering not supported yet'
+        assert input_shape[1] in [20, 4], 'Input dimensions error, check order'
 
-        convs = [Convolution1D(n_filters, filter_length,
-                               init='glorot_uniform',  # change that for gaussian
-                               activation='linear',
-                               border_mode='same',
-                               name='Conv1')(inp)]
+        seq_length, alphabet = input_shape
 
-        for c in range(2, n_conv_layers + 1):
-            convs.append(Convolution1D(n_filters, filter_length,
-                                       init='glorot_uniform',  # change that for gaussian
-                                       activation='linear',
-                                       border_mode='same',
-                                       name='Conv' + str(c))(convs[-1]))  # maybe add L1 regularizer
+        # Input Layer
+        inp = Input(shape=input_shape, name='aa_seq')
 
-        max_pool = MaxPooling1D(pool_length=aa_length)(convs[-1])
+        mask = Masking(mask_value=0.0)(inp)
 
-        flat = Flatten()(max_pool)
-
-        dense = Dense(n_filters, init='glorot_uniform', activation='linear')(Dropout(.5)(flat))
-
-        encoded = Dense(n_filters, init='glorot_uniform', activation='sigmoid')(Dropout(.5)(dense))
-
-        dedense = Dense(n_filters, init='glorot_uniform', activation='linear')(encoded)
-
-        dedense = Dense(n_filters, init='glorot_uniform', activation='linear')(dedense)
-
-        unflat = Reshape(max_pool._keras_shape[1:])(dedense)
-
-        deconvs = [UpSampling1D(length=aa_length, name='Unpooling')(unflat)]
-
-        for c in range(n_conv_layers, 1, -1):
-            deconvs.append(Convolution1D(n_filters, filter_length,
-                                         init='glorot_uniform',  # change that for gaussian
-                                         activation='linear',
-                                         border_mode='same',
-                                         name='Deconv' + str(c))(deconvs[-1]))  # maybe add L1 regularizer
-
-        decoded = Convolution1D(20, filter_length, activation='sigmoid', border_mode='same', name='Deconv1')(
-            deconvs[-1])
-
-        return {'input': inp, 'output': decoded}
-
-    @property
-    def _loss_function(self):
-        return 'mse'
-
-    @staticmethod
-    def mean_cat_acc(inp, decoded):
-        y_true = K.reshape(inp, (-1, 20))
-        y_pred = K.reshape(decoded, (-1, 20))
-        cat_acc = categorical_accuracy(y_true, y_pred)
-        return cat_acc
-
-
-class DeepCoDERwCross(Model):
-    def __init__(self, input, output, name=None):
-        super(DeepCoDERwCross, self).__init__(input, output, name)
-
-        convs = [l for l in self.layers if l.name.find('Conv') == 0]
-
-        deconvs = [l for l in self.layers if l.name.find('Deconv') == 0]
-
-        deconvs = deconvs[::-1]
-
-        for c, d in zip(convs, deconvs):
-            d.W = K.permute_dimensions(c.W, (0, 1, 3, 2))
-            d.b = c.b
-
-    @classmethod
-    def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
-        args = cls._build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length)
-
-        args['name'] = 'krCoDERwCross'
-
-        return cls(**args)
-
-    @classmethod
-    def from_saved_model(cls, filepath):
-        cls.__dict__ = load_model(filepath)
-        cls.__class__ = DeepCoDERwCross
-        return cls
-
-    def save(self, filepath, overwrite=True):
-        self.__class__.__name__ = 'Model'
-        super(DeepCoDERwCross, self).save(filepath, overwrite=overwrite)
-
-    @staticmethod
-    def _build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length):
-        inp = Input(shape=(aa_length, 20), name='aa_seq')  # Assuming tf dimension ordering
-
-        convs = [Convolution1D(n_filters, filter_length,
-                               init='glorot_normal',  # change that for gaussian
-                               activation='sigmoid',
-                               border_mode='same',
-                               name='Conv1')(inp)]
-
-        for c in range(2, n_conv_layers + 1):
-            convs.append(Convolution1D(n_filters, filter_length,
-                                       init='glorot_normal',  # change that for gaussian
-                                       activation='sigmoid',
-                                       border_mode='same',
-                                       name='Conv' + str(c))(convs[-1]))  # maybe add L1 regularizer
-
-        max_pool = MaxPooling1D(pool_length=aa_length)(convs[-1])
-
-        flat = Flatten()(max_pool)
-
-        dense = Dense(n_filters, init='glorot_normal', activation='sigmoid')(Dropout(.5)(flat))
-
-        encoded = Dense(2 * n_filters, init='glorot_normal', activation='sigmoid')(Dropout(.5)(dense))
-
-        dedense = Dense(n_filters, init='glorot_normal', activation='sigmoid')(encoded)
-
-        dedense = Dense(n_filters, init='glorot_normal', activation='sigmoid')(dedense)
-
-        unflat = Reshape(max_pool._keras_shape[1:])(dedense)
-
-        deconvs = [UpSampling1D(length=aa_length, name='Unpooling')(unflat)]
-
-        for c in range(n_conv_layers, 1, -1):
-            deconvs.append(Convolution1D(n_filters, filter_length,
-                                         init='glorot_normal',  # change that for gaussian
-                                         activation='sigmoid',
-                                         border_mode='same',
-                                         name='Deconv' + str(c))(deconvs[-1]))  # maybe add L1 regularizer
-
-        decoded = Convolution1D(20, filter_length, activation='sigmoid', border_mode='same', name='Deconv1')(
-            deconvs[-1])
-
-        return {'input': inp, 'output': decoded}
-
-    @staticmethod
-    def _loss_function(inp, decoded):
-        # y_true = K.reshape(inp, (-1, 20))
-        # y_pred = K.reshape(decoded, (-1, 20))
-        # loss = K.mean(categorical_crossentropy(y_true, y_pred))
-        loss = mean_squared_error(y_true=inp, y_pred=decoded)
-        return loss
-
-    @staticmethod
-    def mean_cat_acc(inp, decoded):
-        y_true = K.reshape(inp, (-1, 20))
-        y_pred = K.reshape(decoded, (-1, 20))
-        cat_acc = categorical_accuracy(y_true, y_pred)
-        return cat_acc
-
-
-class swDeepCoDER(Model):
-    def __init__(self, input, output, name=None):
-        super(swDeepCoDER, self).__init__(input, output, name)
-
-        # convs = [l for l in self.layers if l.name.find('Conv') == 0]
-        #
-        # deconvs = [l for l in self.layers if l.name.find('Deconv') == 0]
-        #
-        # deconvs = deconvs[::-1]
-        #
-        # for c, d in zip(convs, deconvs):
-        #     d.W = K.permute_dimensions(c.W, (0, 1, 3, 2))
-        #     d.b = c.b
-
-    @classmethod
-    def from_options(cls, aa_length, n_filters, filter_length, n_conv_layers=1, n_fc_layers=1):
-        args = cls._build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length)
-
-        args['name'] = 'krswDeepCoDER'
-
-        return cls(**args)
-
-    @classmethod
-    def from_saved_model(cls, filepath):
-        cls.__dict__ = load_model(filepath)
-        cls.__class__ = DeepCoDERwCross
-        return cls
-
-    def save(self, filepath, overwrite=True):
-        self.__class__.__name__ = 'Model'
-        super(swDeepCoDER, self).save(filepath, overwrite=overwrite)
-
-    @staticmethod
-    def _build_network(aa_length, n_conv_layers, n_fc_layers, n_filters, filter_length):
-        inp = Input(shape=(aa_length, 20), name='aa_seq')  # Assuming tf dimension ordering
-
-        convs = [Convolution1D(n_filters, filter_length,
-                               init='glorot_normal',  # change that for gaussian
+        # Convolutional Layers
+        convs = [Convolution1D(nb_filter, filter_length,
+                               init='glorot_uniform',
                                activation='relu',
                                border_mode='same',
-                               name='Conv1')(inp)]
+                               name='Conv1')(mask)]
 
-        for c in range(2, n_conv_layers + 1):
-            convs.append(Convolution1D(n_filters, filter_length,
-                                       init='glorot_normal',  # change that for gaussian
+        for c in range(1, n_conv_layers):
+            convs.append(Convolution1D(nb_filter, filter_length,
+                                       init='glorot_uniform',
                                        activation='relu',
                                        border_mode='same',
-                                       name='Conv' + str(c))(convs[-1]))  # maybe add L1 regularizer
+                                       name='Conv{}'.format(c + 1))(convs[-1]))  # maybe add L1 regularizer
 
-        max_pool = MaxPooling1D(pool_length=aa_length)(convs[-1])
+        # Max-pooling
+        if seq_length:
+            max_pool = MaxPooling1D(pool_length=seq_length)(convs[-1])
+            flat = Flatten()(max_pool)
+        else:
+            # max_pool = GlobalMaxPooling1D()(convs[-1])
+            # flat = max_pool
+            raise NotImplementedError('Sequence length must be known at this point. Pad and use mask.')
 
-        flat = Flatten()(max_pool)
+        # Fully-Connected encoding layers
+        fc_enc = [Dense(nb_filter,
+                        init='glorot_uniform',
+                        activation='sigmoid',
+                        name='FCEnc1')(flat)]
 
-        encoded = Dense(n_filters, init='glorot_normal', activation='sigmoid')(flat)
+        for d in range(1, n_fc_layers):
+            fc_enc.append(Dense(nb_filter,
+                                init='glorot_uniform',
+                                activation='sigmoid',
+                                name='FCEnc{}'.format(d + 1))(fc_enc[-1]))
 
-        dedense = Dense(n_filters, init='glorot_normal', activation='linear')(encoded)
+        encoded = fc_enc[-1]  # To access if model for encoding needed
 
-        unflat = Reshape(max_pool._keras_shape[1:])(dedense)
+        # Fully-Connected decoding layers
+        fc_dec = [Dedense(encoded._keras_history[0],
+                          activation='linear',
+                          name='FCDec{}'.format(n_fc_layers))(encoded)]
 
-        deconvs = [UpSampling1D(length=aa_length, name='Unpooling')(unflat)]
+        for d in range(n_fc_layers - 2, -1, -1):
+            fc_dec.append(Dedense(fc_enc[d]._keras_history[0],
+                                  activation='linear',
+                                  name='FCDec{}'.format(d + 1))(fc_dec[-1]))
 
-        for c in range(n_conv_layers, 1, -1):
-            deconvs.append(Convolution1D(n_filters, filter_length,
-                                         init='glorot_normal',  # change that for gaussian
-                                         activation='relu',
-                                         border_mode='same',
-                                         name='Deconv' + str(c))(deconvs[-1]))  # maybe add L1 regularizer
+        # Reshaping and unpooling
+        if seq_length:
+            unflat = Reshape(max_pool._keras_shape[1:])(fc_dec[-1])
+        else:
+            unflat = Reshape((1, fc_dec[-1]._keras_shape[-1]))(fc_dec[-1])
 
-        decoded = Convolution1D(20, filter_length, activation='sigmoid', border_mode='same', name='Deconv1')(
-            deconvs[-1])
+        deconvs = [Unpooling1D(max_pool._keras_history[0], name='Unpooling')(unflat)]
+
+        # Deconvolution
+        for c in range(n_conv_layers - 1, 0, -1):
+            deconvs.append(Deconvolution1D(convs[c]._keras_history[0],
+                                           activation='relu',
+                                           name='Deconv{}'.format(c + 1))(deconvs[-1]))  # maybe add L1 regularizer
+
+        decoded = Deconvolution1D(convs[0]._keras_history[0],
+                                  apply_mask=True,
+                                  activation='sigmoid',
+                                  name='Deconv1')(deconvs[-1])
 
         return {'input': inp, 'output': decoded}
 
     @staticmethod
     def _loss_function(inp, decoded):
-        # y_true = K.reshape(inp, (-1, 20))
-        # y_pred = K.reshape(decoded, (-1, 20))
+        # y_true = K.reshape(inp, (-1, K.shape(inp)[-1]))
+        # y_pred = K.reshape(decoded, (-1, K.shape(inp)[-1]))
         # loss = K.mean(categorical_crossentropy(y_true, y_pred))
         loss = mean_squared_error(y_true=inp, y_pred=decoded)
         return loss
 
     @staticmethod
     def mean_cat_acc(inp, decoded):
-        y_true = K.reshape(inp, (-1, 20))
-        y_pred = K.reshape(decoded, (-1, 20))
+        y_true = K.reshape(inp, (-1, K.shape(inp)[-1]))
+        y_pred = K.reshape(decoded, (-1, K.shape(inp)[-1]))
         cat_acc = categorical_accuracy(y_true, y_pred)
         return cat_acc

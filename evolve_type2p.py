@@ -8,7 +8,7 @@ import theano
 import theano.tensor as ten
 
 from evolutron.tools import num2aa, nt2prob, aa2num, num2hot
-from evolutron.trainers.thn import ConvType2p
+from evolutron.engine.las import ConvType2p
 
 # def main(mode, padded, handle=None, **options):
 padded = True

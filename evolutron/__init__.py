@@ -11,6 +11,6 @@ from . import motifs
 from . import networks
 from . import structural
 from . import tools
-from . import trainers
+from . import engine
 
 __version__ = "0.1.alpha"

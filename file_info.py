@@ -72,7 +72,7 @@ def folder_info(foldername):
 
 def main(filename, **options):
     import evolutron.networks.las as nets
-    from evolutron.trainers.thn import DeepTrainer
+    from evolutron.engine.las import DeepTrainer
 
     if '.fasta' in filename:
         count = 0
