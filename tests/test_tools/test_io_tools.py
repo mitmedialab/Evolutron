@@ -42,10 +42,12 @@ def test_tab_parser():
 
 
 def test_secs_parser():
-    # TODO: implement this
-    pass
+    x_data, y_data = io.secs_parser('tests/test_tools/samples/smallSecS.sec')
+
+    assert x_data, y_data
 
 
 def test_npz_parser():
-    # TODO: implement this
-    pass
+    x_data, y_data = io.npz_parser('/data/datasets/cb513+profile_split1.npy.gz')
+
+    assert x_data, y_data
