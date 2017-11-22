@@ -5,38 +5,6 @@ from .seq_tools import aa2hot
 from ..tools import io_tools as io
 
 
-# TODO: The file_db dict will be removed soon
-# file_db = {
-#     'random': '/data/datasets/random_aa.fasta',
-#     'type2p': '/data/datasets/type2p_ps_aa.fasta',
-#     'type2': '/data/datasets/sprot_type2_pfam.tsv',
-#     'hsapiens': '/data/datasets/sprot_hsapiens_pfam.tsv',
-#     'ecoli': '/data/datasets/sprot_ecoli_pfam.tsv',
-#     'zinc': '/data/datasets/sprot_znf_prot_pfam.tsv',
-#     'homeo': '/data/datasets/sprot_homeo_pfam.tsv',
-#     'crispr': '/data/datasets/sprot_crispr_pfam.tsv',
-#     'cas9': '/data/datasets/sprot_cas9_pfam.tsv',
-#     'cd4': '/data/datasets/sprot_cd4_pfam.tsv',
-#     'dnabind': '/data/datasets/sprot_dna_tf_pfam.tsv',
-#     'SecS': '/data/datasets/SecS.sec',
-#     'smallSecS': '/data/datasets/smallSecS.sec',
-#     'tinySecS': '/data/datasets/tinySecS.sec',
-#     'cullPDB': '/data/datasets/cullpdb+profile_6133_filtered.npy.gz',
-#     'cb513': '/data/datasets/cb513+profile_split1.npy.gz',
-#     'human_ors': '/data/datasets/uniprot_human_ors.tsv',
-#     'casp10': '/data/datasets/casp10.sec',
-#     'casp11': '/data/datasets/casp11.sec',
-#     'hsapx': '/data/datasets/sprot_hsapiens_expr_pfam.tsv',
-#     'scop': '/data/datasets/scop2.fasta',
-#     'swissprot': '/data/datasets/sprot_all_pfam.tsv',
-#     'acetyl': '/data/datasets/sprot_ec2_3_pfam.tsv',
-#     'mycoplasma': '/data/datasets/uniprot_mycoplasma_pfam.tsv',
-#     'small_all': '/data/datasets/small_uniprot-all.tsv',
-#     'go': '/data/datasets/sprot_go.tsv',
-#     'ppi': '/data/datasets/ppi_seq.h5'
-# }
-
-
 def data_it(dataset, block_size, multi_data=False):
     """ Iterates through a large array, yielding chunks of block_size.
     """

@@ -4,7 +4,6 @@ try:
 except ImportError:
     import pickle as cPickle
 import csv
-
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
