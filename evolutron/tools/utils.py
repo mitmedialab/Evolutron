@@ -121,8 +121,8 @@ class Handle(object):
                  model=None,
                  ftype=None,
                  infile=None,
-                 conv=None,
-                 fc=None,
+                 n_conv_layers=None,
+                 n_fc_layers=None,
                  **kwargs):
         self.epochs = epochs
         self.filters = filters
@@ -130,10 +130,11 @@ class Handle(object):
 
         self.model = model
         self.ftype = ftype
+        print(infile)
         self.data_id = infile.split('/')[-1].split('.')[0]
 
-        self.n_convs = conv
-        self.n_fc = fc
+        self.n_convs = n_conv_layers
+        self.n_fc = n_fc_layers
 
         self.filename = str(self).split('/')[-1]
 

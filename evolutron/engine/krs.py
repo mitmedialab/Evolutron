@@ -1,27 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import division
-from __future__ import print_function
+from __future__ import division, print_function
 
+import json
 import os
 import time
+import warnings
 from collections import OrderedDict, defaultdict
 
-import numpy as np
 import h5py
-import json
-import warnings
-from tabulate import tabulate
-
 import keras
 import keras.backend as K
 import keras.optimizers as opt
+import numpy as np
+from keras.callbacks import ModelCheckpoint
 from keras.engine import topology
 from keras.layers import deserialize_keras_object
-from keras.callbacks import ModelCheckpoint
-
-from evolutron.tools import Handle
-
 from sklearn.model_selection import train_test_split
+from tabulate import tabulate
 
 if K.backend() == 'theano':
     from theano.compile.nanguardmode import NanGuardMode
@@ -635,26 +630,28 @@ class Model(keras.models.Model):
         # self.set_all_param_values(new)
         raise NotImplementedError
 
-    def save(self, handle, **save_args):
+    def save(self, handle, data_dir=None, **save_args):
 
-        if isinstance(handle, Handle):
-            handle.ftype = 'model'
-            handle.epochs = len(self.history.epoch)
-            filename = 'models/' + handle
-            if not os.path.exists('/'.join(filename.split('/')[:-1])):
-                os.makedirs('/'.join(filename.split('/')[:-1]))
-        else:
-            filename = handle
+        handle.ftype = 'model'
+        handle.epochs = len(self.history.epoch)
+        filename = 'models/' + handle
+        if data_dir:
+            filename = os.path.join(data_dir, filename)
+
+        if not os.path.exists('/'.join(filename.split('/')[:-1])):
+            os.makedirs('/'.join(filename.split('/')[:-1]))
 
         super(Model, self).save(filename, **save_args)
 
         print('Model saved to: ' + filename)
 
-    def save_train_history(self, handle):
+    def save_train_history(self, handle, data_dir=None):
         handle.ftype = 'history'
         handle.epochs = len(self.history.epoch)
-
         filename = 'models/' + handle
+        if data_dir:
+            filename = os.path.join(data_dir, filename)
+
         if not os.path.exists('/'.join(filename.split('/')[:-1])):
             os.makedirs('/'.join(filename.split('/')[:-1]))
 

@@ -3,107 +3,11 @@ try:
     import cPickle
 except ImportError:
     import pickle as cPickle
-import csv
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from .seq_tools import aa2codon, aa_map, hot2aa, nt_map, secs2hot
-from .utils import ZincFinger
-
-
-def b1h(padded=False, min_aa=None, max_aa=None):
-    filename = 'datasets/B1H.motifs.csv'
-
-    data = csv.DictReader(open(filename, 'r'))
-
-    znf = []
-
-    for d in data:
-        r_s = np.zeros((4, 4))
-        for i, nt in enumerate(['A', 'C', 'G', 'T']):
-            for pos in range(4):
-                r_s[i, pos] = d[nt + str(pos + 1)]
-        znf.append(ZincFinger(d['Gene/Range'], d['Organism'], d['ZF protein sequence'], None, r_s))
-
-    aa_list = [zf.aa for zf in znf if zf.aa.find('X') == -1]
-
-    if padded:
-        if not max_aa:
-            max_aa = max(map(len, aa_list))
-        x_data = np.zeros((len(aa_list), 20, max_aa), dtype=np.float32)
-        for i, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                x_data[i, int(aa_map[aa]), j] = 1
-    else:
-        x_data = [np.zeros((20, max(len(aa_seq), min_aa)), dtype=np.float32) for aa_seq in aa_list]
-
-        for ind, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                x_data[ind][int(aa_map[aa]), j] = 1
-
-    y_data = np.asarray([zf.rec_site.reshape(16) for zf in znf if zf.aa.find('X') == -1])
-
-    dataset = x_data, y_data
-
-    return dataset
-
-
-def m6a(padded=False, min_aa=None, max_aa=None, probe='both'):
-    """
-        This module parses data from m6a proto-array for Evolutron
-    """
-    infile = 'datasets/m6a.csv'
-    data = csv.DictReader(open(infile, 'r'))
-    data = list(data)
-
-    empty = [d for d in data if len(d['AA']) <= 4]
-
-    unknown = [d for d in data if not d['AA'].find('U') == -1 or not d['AA'].find('X') == -1]
-
-    passed = [d for d in data if len(d['AA']) > 5 and d['AA'].find('U') == -1 and d['AA'].find('X') == -1]
-
-    probe1 = [p for p in passed[::2]]
-    probe2 = [p for p in passed[1::2]]
-
-    if probe == '1':
-        datapoints = probe1
-    elif probe == '2':
-        datapoints = probe2
-    else:
-        datapoints = passed
-
-    del probe1
-    del probe2
-    del passed
-
-    aa_list = []
-    conc_list = []
-    for d in datapoints:
-        aa_list.append(eval(d['AA'])[0][0])
-        conc_list.append([float(d['Array_60531']), float(d['Array_60690']), float(d['mean'])])
-
-    if padded:
-        if not max_aa:
-            max_aa = max(map(len, aa_list))
-        x_data = np.zeros((len(aa_list), 20, max_aa), dtype=np.float32)
-        for i, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                if j == min_aa:
-                    break
-                x_data[i, int(aa_map[aa]), j] = 1
-    else:
-        x_data = [np.zeros((20, max(len(aa_seq), min_aa)), dtype=np.float32) for aa_seq in aa_list]
-
-        for ind, aa_seq in enumerate(aa_list):
-            for j, aa in enumerate(aa_seq):
-                x_data[ind][int(aa_map[aa]), j] = 1
-
-    y_data = np.asarray(conc_list)
-
-    dataset = x_data, y_data
-
-    return dataset
+from .seq_tools import aa2codon, hot2aa, nt_map, secs2hot
 
 
 def type2p_code(description):

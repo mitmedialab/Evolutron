@@ -39,8 +39,10 @@ class Motif(object):
 
 
 # noinspection PyShadowingNames
-def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth, multiinput=False):
+def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth, data_dir=None, multi_input=False):
     foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth + 1)
+    if data_dir:
+        foldername = os.path.join(data_dir, foldername)
     if not os.path.exists(foldername):
         os.makedirs(foldername)
     else:
@@ -52,8 +54,8 @@ def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth, mul
 
     # Calculate the activations for each filter for each protein in data set
     max_seq_scores = []
-    for x_part in data_it(x_data, 1000, multi_data=multiinput):
-        if multiinput:
+    for x_part in data_it(x_data, 1000, multi_data=multi_input):
+        if multi_input:
             seq_scores = np.squeeze(motif_fun(x_part), 0)
         else:
             seq_scores = np.squeeze(motif_fun([x_part]), 0)
@@ -96,23 +98,21 @@ def generate_motifs(matches):
     return motifs
 
 
-def generate_logos(motifs, foldername):
+def generate_logos(motifs, foldername, filetype='png'):
     options = wl.LogoOptions()
     options.color_scheme = wl.std_color_schemes["chemistry"]
 
     for i, motif in enumerate(motifs):
         if motif:
             my_format = wl.LogoFormat(motif.data, options)
-            # my_png = wl.png_print_formatter(motif.data, my_format)
-            my_pdf = wl.pdf_formatter(motif.data, my_format)
-            # foo = open(foldername + '/' + str(i) + ".png", "w")
-            # foo.write(my_png)
-            # foo.close()
-            foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".pdf", "wb")
-            foo.write(my_pdf)
+            if filetype == 'png':
+                to_write = wl.png_print_formatter(motif.data, my_format)
+            elif filetype == 'pdf':
+                to_write = wl.pdf_formatter(motif.data, my_format)
+            elif filetype == 'txt':
+                to_write = ''.join(["%s\n" % str(seq) for seq in motif.seqs])
+            else:
+                raise ValueError('Invalid filetype. Available options: png, pdf or txt. ')
+            foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + "." + filetype, "wb")
+            foo.write(to_write)
             foo.close()
-            # foo = open(foldername + str(i) + ".txt", "w")
-            # for seq in motif.seqs:
-            #     foo.write("%s\n" % str(seq))
-            # foo.close()
-    return
