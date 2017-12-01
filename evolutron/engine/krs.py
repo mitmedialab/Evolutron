@@ -442,7 +442,10 @@ class Model(keras.models.Model):
                 stratify = None
 
             if self.nb_inputs == 1:
-                x_train, x_valid = train_test_split(x, test_size=validation_split, stratify=stratify, random_state=5)
+                x_train, x_valid = train_test_split(x, test_size=validation_split,
+                                                    stratify=stratify,
+                                                    shuffle=shuffle,
+                                                    random_state=5)
             else:
                 stratify = None
                 x_train = [[] for _ in x]
