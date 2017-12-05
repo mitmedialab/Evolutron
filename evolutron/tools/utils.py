@@ -130,7 +130,6 @@ class Handle(object):
 
         self.model = model
         self.ftype = ftype
-        print(infile)
         self.data_id = infile.split('/')[-1].split('.')[0]
 
         self.n_convs = n_conv_layers

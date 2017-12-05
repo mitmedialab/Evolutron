@@ -39,7 +39,8 @@ class Motif(object):
 
 
 # noinspection PyShadowingNames
-def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth, data_dir=None, multi_input=False):
+def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth,
+                     data_dir=None, multi_input=False, filetype='png'):
     foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth + 1)
     if data_dir:
         foldername = os.path.join(data_dir, foldername)
@@ -81,7 +82,7 @@ def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth, dat
     motifs = generate_motifs(matches)
     print('Extracted {0} motifs'.format(len([1 for m in motifs if m])))
 
-    generate_logos(motifs, foldername)
+    generate_logos(motifs, foldername, filetype)
     print("Generating Sequence Logos")
     return
 
