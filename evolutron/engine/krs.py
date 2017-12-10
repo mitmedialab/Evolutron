@@ -436,6 +436,32 @@ class Model(keras.models.Model):
 
         print('Model saved to: ' + filename)
 
+    def save_architecture(self, handle, data_dir=None, filetype='json'):
+
+        if isinstance(handle, Handle):
+            handle.ftype = 'arch'
+            handle.epochs = len(self.history.epoch)
+        else:
+            handle += '.arch'
+
+        filename = 'models/' + handle
+        if data_dir:
+            filename = os.path.join(data_dir, filename)
+
+        if not os.path.exists('/'.join(filename.split('/')[:-1])):
+            os.makedirs('/'.join(filename.split('/')[:-1]))
+
+        if filetype == 'json':
+            with open(filename, 'wb') as f:
+                f.write(super(Model, self).to_json())
+        elif filetype == 'yaml':
+            with open(filename, 'wb') as f:
+                f.write(super(Model, self).to_yaml())
+        else:
+            raise ValueError('Invalid file type for saving.')
+
+        print('Architecture saved to: ' + filename)
+
     def save_train_history(self, handle, data_dir=None):
 
         if isinstance(handle, Handle):
