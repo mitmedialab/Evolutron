@@ -5,7 +5,7 @@ import json
 import os
 import time
 import warnings
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 import h5py
 import keras
@@ -15,12 +15,14 @@ import numpy as np
 from keras.callbacks import ModelCheckpoint
 from keras.engine import topology
 from keras.layers import deserialize_keras_object
+from keras.utils import print_summary
 from sklearn.model_selection import train_test_split
-from tabulate import tabulate
 
 if K.backend() == 'theano':
     from theano.compile.nanguardmode import NanGuardMode
     from theano.compile.monitormode import MonitorMode
+
+from ..tools import Handle
 
 
 def load_model(filepath, custom_objects=None, compile=True):
@@ -148,12 +150,10 @@ class Model(keras.models.Model):
     def __init__(self, inputs, outputs, name=None,
                  classification=False,
                  verbose=False,
-                 generator=None,
                  nb_inputs=1,
                  nb_outputs=1):
 
         self.verbose = verbose
-        self.generator = generator
         self.nb_inputs = nb_inputs
         self.nb_outputs = nb_outputs
 
@@ -211,101 +211,36 @@ class Model(keras.models.Model):
                                        sample_weight_mode=sample_weight_mode,
                                        metrics=metrics)
 
-    def fit_generator(self, x_data, y_data,
-                      generator=None,
-                      epochs=1,
-                      verbose=1,
-                      callbacks=None,
-                      validation_data=None,
-                      validation_split=.0,
-                      validation_steps=None,
-                      class_weight=None,
-                      max_q_size=10,
-                      workers=1,
-                      pickle_safe=False,
-                      initial_epoch=0,
-                      batch_size=64, shuffle=True,
-                      return_best_model=True,
-                      monitor='val_loss',
-                      **generator_options):
-
-        # Check arguments
-        if generator is None:
-            generator = self.generator
-
-        assert (validation_split >= 0)
-        assert epochs > 0
-
-        if validation_data is None:
-            if self.classification:
-                stratify = y_data  # TODO: here you should select with which part to stratify
-            else:
-                stratify = None
-
-            if self.nb_inputs == 1:
-                x_train, x_valid = train_test_split(x_data, test_size=validation_split, stratify=stratify,
-                                                    random_state=5)
-            else:
-                stratify = None
-                x_train = [[] for _ in x_data]
-                x_valid = [[] for _ in x_data]
-                for i, x_d in enumerate(x_data):
-                    x_train[i], x_valid[i] = train_test_split(x_d, test_size=validation_split, stratify=stratify,
-                                                              random_state=5)
-            if self.nb_outputs == 1:
-                y_train, y_valid = train_test_split(y_data, test_size=validation_split, stratify=stratify,
-                                                    random_state=5)
-            else:
-                stratify = None
-                y_train = [[] for _ in y_data]
-                y_valid = [[] for _ in y_data]
-                for i, y_d in enumerate(y_data):
-                    y_train[i], y_valid[i] = train_test_split(y_d, test_size=validation_split, stratify=stratify,
-                                                              random_state=5)
-        else:
-            x_train = x_data
-            y_train = y_data
-            x_valid = validation_data[0]
-            y_valid = validation_data[1]
-
-        if self.nb_inputs == 1:
-            nb_train_samples = len(x_train)
-            nb_val_samples = len(x_valid)
-        else:
-            nb_train_samples = len(x_train[0])
-            nb_val_samples = len(x_valid[0])
+    def fit_generator(self, epochs=1, initial_epoch=0, verbose=1, callbacks=None, class_weight=None, max_queue_size=10,
+                      workers=4, use_multiprocessing=True, shuffle=True, return_best_model=True, monitor='val_loss',
+                      **data_arguments):
 
         if return_best_model:
             rn = np.random.random()
             checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
                                          monitor=monitor,
-                                         verbose=1,
+                                         verbose=verbose,
                                          mode='min',
                                          save_best_only=True,
                                          save_weights_only=True)
-            callbacks.append(checkpoint)
-
-        for cb in callbacks:
-            cb.validation_data = (x_valid, y_valid)
+            if isinstance(callbacks, list):
+                callbacks.append(checkpoint)
+            else:
+                callbacks = [checkpoint]
 
         start_time = time.time()
-        try:
-            super(Model, self).fit_generator(generator=generator(x_train, y_train, batch_size=batch_size,
-                                                                 shuffle=shuffle, **generator_options),
-                                             steps_per_epoch=np.ceil(nb_train_samples / batch_size),
-                                             epochs=epochs,
-                                             verbose=verbose,
-                                             callbacks=callbacks,
-                                             validation_data=generator(x_valid, y_valid, batch_size=batch_size,
-                                                                       **generator_options),
-                                             validation_steps=np.ceil(nb_val_samples / batch_size),
-                                             workers=workers,
-                                             max_q_size=max_q_size,
-                                             pickle_safe=pickle_safe,
-                                             initial_epoch=initial_epoch)
+        super(Model, self).fit_generator(verbose=verbose,
+                                         initial_epoch=initial_epoch,
+                                         epochs=epochs,
+                                         callbacks=callbacks,
+                                         workers=workers,
+                                         use_multiprocessing=use_multiprocessing,
+                                         max_queue_size=max_queue_size,
+                                         shuffle=shuffle,
+                                         **data_arguments)
+        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
 
-        except KeyboardInterrupt:
-            return
+                                                                          time.time() - start_time))
 
         if return_best_model:
             try:
@@ -314,102 +249,6 @@ class Model(keras.models.Model):
                 print('Unable to load best parameters, saving current model.')
 
         self.history_list.append(self.history)
-
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-                                                                          time.time() - start_time))
-
-        return x_valid, y_valid
-
-    def fit_generator_from_file(self, nb_samples=None,
-                                generator=None,
-                                steps_per_epoch=None,
-                                epochs=1,
-                                verbose=1,
-                                callbacks=None,
-                                validation_data=None,
-                                validation_steps=None,
-                                validation_split=.0,
-                                class_weight=None,
-                                max_q_size=10,
-                                workers=1,
-                                use_multiprocessing=False,
-                                initial_epoch=0,
-                                batch_size=64,
-                                shuffle=True,
-                                return_best_model=True,
-                                monitor='val_loss',
-                                **generator_options):
-
-        # Check arguments
-        if generator is None:
-            generator = self.generator
-
-        assert (validation_split >= 0)
-        assert epochs > 0
-
-        if steps_per_epoch is None:
-            nb_train_samples = int(nb_samples * (1 - validation_split))
-            steps_per_epoch = np.ceil(nb_train_samples / batch_size)
-        if validation_steps is None:
-            nb_val_samples = nb_samples - nb_train_samples
-            validation_steps = np.ceil(nb_val_samples / batch_size)
-
-        if callable(generator):
-            generator = generator(batch_size=batch_size, **generator_options)
-
-        if validation_data is None:
-            validation_data = generator
-
-        """
-        index_array = np.arange(nb_samples, dtype=np.int32)
-        if shuffle == 'shuffle':
-            np.random.shuffle(index_array)
-        """
-
-        if return_best_model:
-            rn = np.random.random()
-            checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
-                                         monitor=monitor,
-                                         verbose=1,
-                                         mode='min',
-                                         save_best_only=True,
-                                         save_weights_only=True)
-            callbacks.append(checkpoint)
-
-        for cb in callbacks:
-            cb.validation_data = validation_data
-            cb.validation_steps = validation_steps
-
-        start_time = time.time()
-        try:
-            super(Model, self).fit_generator(generator=generator,
-                                             steps_per_epoch=steps_per_epoch,
-                                             epochs=epochs,
-                                             verbose=verbose,
-                                             callbacks=callbacks,
-                                             validation_data=validation_data,
-                                             validation_steps=validation_steps,
-                                             workers=workers,
-                                             max_q_size=max_q_size,
-                                             initial_epoch=initial_epoch,
-                                             class_weight=class_weight,
-                                             use_multiprocessing=use_multiprocessing)
-
-        except KeyboardInterrupt:
-            return
-
-        if return_best_model:
-            try:
-                self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
-            except:
-                print('Unable to load best parameters, saving current model.')
-
-        self.history_list.append(self.history)
-
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-                                                                          time.time() - start_time))
-
-        return
 
     def fit(self, x=None, y=None,
             batch_size=32,
@@ -479,20 +318,19 @@ class Model(keras.models.Model):
             callbacks.append(checkpoint)
 
         start_time = time.time()
-        try:
-            super(Model, self).fit(x=x_train, y=y_train,
-                                   batch_size=batch_size,
-                                   epochs=epochs,
-                                   initial_epoch=initial_epoch,
-                                   verbose=verbose,
-                                   callbacks=callbacks,
-                                   validation_data=(x_valid, y_valid),
-                                   shuffle=True,
-                                   class_weight=None,
-                                   sample_weight=None)
-        except KeyboardInterrupt:
-            pass
+        super(Model, self).fit(x=x_train, y=y_train,
+                               batch_size=batch_size,
+                               epochs=epochs,
+                               initial_epoch=initial_epoch,
+                               verbose=verbose,
+                               callbacks=callbacks,
+                               validation_data=(x_valid, y_valid),
+                               shuffle=True,
+                               class_weight=None,
+                               sample_weight=None)
 
+        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
+                                                                          time.time() - start_time))
         if return_best_model:
             try:
                 self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
@@ -501,66 +339,12 @@ class Model(keras.models.Model):
 
         self.history_list.append(self.history)
 
-        print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-                                                                          time.time() - start_time))
-
         return x_valid, y_valid
 
-    def evaluate_generator(self, generator=None, steps=None, batch_size=1, **options):
-        if generator is None:
-            generator = self.generator(batch_size=batch_size, shuffle=False, **options)
+    # TODO: implement predict/evaluate generator
 
-        if steps is None:
-            if 'x_data' in options and self.nb_inputs == 1:
-                nb_samples = len(options['x_data'])
-            elif 'x_data' in options:
-                nb_samples = len(options['x_data'][0])
-            elif 'nb_samples' in options:
-                nb_samples = options.pop('nb_samples')
-            else:
-                raise KeyError('Must give x_data or nb_samples argument')
-
-            steps = np.ceil(nb_samples / batch_size)
-
-        return super(Model, self).evaluate_generator(generator=generator,
-                                                     steps=steps)
-
-    def predict_generator(self, x_data=None, generator=None, steps=None, batch_size=1, **options):
-        if generator is None:
-            generator = self.generator(x_data, batch_size=batch_size, shuffle=False)
-
-            if self.nb_inputs == 1:
-                nb_train_samples = len(x_data)
-            else:
-                nb_train_samples = len(x_data[0])
-            steps = np.ceil(nb_train_samples / batch_size)
-        else:
-            assert steps is not None
-
-        return super(Model, self).predict_generator(generator=generator,
-                                                    steps=steps,
-                                                    max_q_size=10,
-                                                    workers=1,
-                                                    pickle_safe=False)
-
-    def display_network_info(self):
-
-        print("Neural Network has {0} trainable parameters".format(self.n_params))
-
-        layers = self.get_all_layers()
-
-        ids = list(range(len(layers)))
-
-        names = [layer.name for layer in layers]
-
-        shapes = ['x'.join(map(str, layer.output_shape[1:])) for layer in layers]
-        # TODO: maybe show weights shape also
-
-        params = [layer.count_params() for layer in layers]
-
-        tabula = OrderedDict([('#', ids), ('Name', names), ('Shape', shapes), ('Parameters', params)])
-
-        print(tabulate(tabula, 'keys'))
+    def display_network_info(self, line_length=100):
+        print_summary(self, line_length=line_length)
 
     def get_all_layers(self):
         return self.layers
@@ -635,8 +419,12 @@ class Model(keras.models.Model):
 
     def save(self, handle, data_dir=None, **save_args):
 
-        handle.ftype = 'model'
-        handle.epochs = len(self.history.epoch)
+        if isinstance(handle, Handle):
+            handle.ftype = 'model'
+            handle.epochs = len(self.history.epoch)
+        else:
+            handle += '.model'
+
         filename = 'models/' + handle
         if data_dir:
             filename = os.path.join(data_dir, filename)
@@ -649,8 +437,12 @@ class Model(keras.models.Model):
         print('Model saved to: ' + filename)
 
     def save_train_history(self, handle, data_dir=None):
-        handle.ftype = 'history'
-        handle.epochs = len(self.history.epoch)
+
+        if isinstance(handle, Handle):
+            handle.ftype = 'history'
+            handle.epochs = len(self.history.epoch)
+        else:
+            handle += '.history'
         filename = 'models/' + handle
         if data_dir:
             filename = os.path.join(data_dir, filename)
