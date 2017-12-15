@@ -16,13 +16,8 @@ from keras.callbacks import ModelCheckpoint
 from keras.engine import topology
 from keras.layers import deserialize_keras_object
 from keras.utils import print_summary
-from sklearn.model_selection import train_test_split
 
-if K.backend() == 'theano':
-    from theano.compile.nanguardmode import NanGuardMode
-    from theano.compile.monitormode import MonitorMode
-
-from ..tools import Handle
+from ..tools import Handle, train_valid_split
 
 
 def load_model(filepath, custom_objects=None, compile=True):
@@ -164,6 +159,7 @@ class Model(keras.models.Model):
         self.valid_loss = []
         self.train_acc = []
         self.valid_acc = []
+        self.training_duration = 0.0
 
         self.fold_train_losses = None
         self.fold_val_losses = None
@@ -238,9 +234,10 @@ class Model(keras.models.Model):
                                          max_queue_size=max_queue_size,
                                          shuffle=shuffle,
                                          **data_arguments)
+        end_time = time.time()
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-
-                                                                          time.time() - start_time))
+                                                                          end_time - start_time))
+        self.training_duration = end_time - start_time
 
         if return_best_model:
             try:
@@ -250,72 +247,42 @@ class Model(keras.models.Model):
 
         self.history_list.append(self.history)
 
-    def fit(self, x=None, y=None,
-            batch_size=32,
-            epochs=1,
-            initial_epoch=0,
-            verbose=1,
-            callbacks=None,
-            validation_split=0.,
-            validation_data=None,
-            shuffle=True,
-            class_weight=None,
-            sample_weight=None,
-            return_best_model=True,
-            reduce_factor=.5,
-            **kwargs):
+    def fit(self, x=None, y=None, batch_size=32, epochs=1, initial_epoch=0, verbose=1, callbacks=None,
+            validation_split=0., validation_data=None, shuffle=True, return_best_model=True, reduce_factor=.5,
+            monitor='val_loss', **fit_kwargs):
 
         # Check arguments
         assert (validation_split >= 0)
         assert epochs > 0
 
+        if self.classification:
+            stratify = y
+        else:
+            stratify = None
+
         if validation_data:
             x_train, y_train = x, y
-            x_valid, y_valid = validation_data
-
-        elif validation_split > 0:
-
-            if self.classification:
-                stratify = y
-            else:
-                stratify = None
-
-            if self.nb_inputs == 1:
-                x_train, x_valid = train_test_split(x, test_size=validation_split,
-                                                    stratify=stratify,
-                                                    shuffle=shuffle,
-                                                    random_state=5)
-            else:
-                stratify = None
-                x_train = [[] for _ in x]
-                x_valid = [[] for _ in x]
-                for i, x_d in enumerate(x):
-                    x_train[i], x_valid[i] = train_test_split(x_d, test_size=validation_split, stratify=stratify,
-                                                              random_state=5)
-            if self.nb_outputs == 1:
-                y_train, y_valid = train_test_split(y, test_size=validation_split, stratify=stratify, random_state=5)
-            else:
-                stratify = None
-                y_train = [[] for _ in y]
-                y_valid = [[] for _ in y]
-                for i, y_d in enumerate(y):
-                    y_train[i], y_valid[i] = train_test_split(y_d, test_size=validation_split, stratify=stratify,
-                                                              random_state=5)
-
         else:
-            x_train, y_train = x, y
-            x_valid, y_valid = [], []
+            if validation_split > 0:
+                x_train, y_train, x_valid, y_valid = train_valid_split(x, y, validation_split=validation_split,
+                                                                       shuffle=shuffle, stratify=stratify)
+                validation_data = x_valid, y_valid
+            else:
+                x_train, y_train = x, y
+                validation_data = None
 
         if return_best_model:
             rn = np.random.random()
             checkpoint = ModelCheckpoint('/tmp/best_{0}.h5'.format(rn),
-                                         monitor='val_loss',
-                                         verbose=1,
+                                         monitor=monitor,
+                                         verbose=verbose,
                                          mode='min',
                                          save_best_only=True,
                                          save_weights_only=True)
-            # TODO: this is multiply defined, define only once per fit
-            callbacks.append(checkpoint)
+            if isinstance(callbacks, list):
+                callbacks.append(checkpoint)
+            else:
+                callbacks = [checkpoint]
 
         start_time = time.time()
         super(Model, self).fit(x=x_train, y=y_train,
@@ -324,18 +291,19 @@ class Model(keras.models.Model):
                                initial_epoch=initial_epoch,
                                verbose=verbose,
                                callbacks=callbacks,
-                               validation_data=(x_valid, y_valid),
-                               shuffle=True,
-                               class_weight=None,
-                               sample_weight=None)
-
+                               validation_data=validation_data,
+                               shuffle=shuffle,
+                               **fit_kwargs)
+        end_time = time.time()
         print('Model trained for {0} epochs. Total time: {1:.3f}s'.format(len(self.history.epoch),
-                                                                          time.time() - start_time))
+                                                                          end_time - start_time))
+        self.training_duration = end_time - start_time
         if return_best_model:
             try:
                 self.load_all_param_values('/tmp/best_{0}.h5'.format(rn))
-            except:
+            except Exception as e:
                 print('Unable to load best parameters, saving current model.')
+                print(e)
 
         self.history_list.append(self.history)
 
@@ -388,21 +356,6 @@ class Model(keras.models.Model):
         except:
             raise AttributeError("Model has no convolutional layers.")
 
-    def set_conv_param_values(self, source):
-
-        # conv_layer = [x for x in self.get_all_layers() if x.name.find('Conv') > -1]
-        #
-        # if not conv_layer:
-        #     raise AttributeError("Model has no convolutional layers.")
-        #
-        # try:
-        #
-        #     lasagne.layers.set_all_param_values(conv_layer[-1], source)
-        # except Exception:
-        #     msg = 'Incorrect parameter list'
-        #     raise ValueError(msg)
-        raise NotImplementedError
-
     def reset_all_param_values(self):
         # old = lasagne.layers.get_all_param_values(self.network)
         # new = []
@@ -452,10 +405,10 @@ class Model(keras.models.Model):
             os.makedirs('/'.join(filename.split('/')[:-1]))
 
         if filetype == 'json':
-            with open(filename, 'wb') as f:
+            with open(filename, 'w') as f:
                 f.write(super(Model, self).to_json())
         elif filetype == 'yaml':
-            with open(filename, 'wb') as f:
+            with open(filename, 'w') as f:
                 f.write(super(Model, self).to_yaml())
         else:
             raise ValueError('Invalid file type for saving.')
@@ -476,7 +429,7 @@ class Model(keras.models.Model):
         if not os.path.exists('/'.join(filename.split('/')[:-1])):
             os.makedirs('/'.join(filename.split('/')[:-1]))
 
-        np.savez_compressed(filename, **self.history.history)
+        np.savez_compressed(filename, training_duration=self.training_duration, **self.history.history)
 
         print('History saved to: ' + filename)
 

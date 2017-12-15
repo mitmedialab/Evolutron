@@ -1,6 +1,9 @@
 # coding=utf-8
+from functools import partial
+
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from .seq_tools import aa2hot
 from ..tools import io_tools as io
@@ -139,3 +142,26 @@ def load_dataset(infile, codes=None, code_key=None, nb_aa=20, **parser_options):
     else:
         raise NotImplementedError('There is no parser for current file type.')
     return x_data, y_data
+
+
+def train_valid_split(x, y, nb_inputs=1, nb_outputs=1, validation_split=0.0, stratify=None, shuffle=True):
+    seed = np.random.randint(0, 10)
+    split_func = partial(train_test_split, test_size=validation_split, stratify=stratify, shuffle=shuffle,
+                         random_state=seed)
+    if nb_inputs == 1:
+        x_train, x_valid = split_func(x)
+    else:
+        x_train = [[] for _ in x]
+        x_valid = [[] for _ in x]
+        for i, x_d in enumerate(x):
+            x_train[i], x_valid[i] = split_func(x_d)
+
+    if nb_outputs == 1:
+        y_train, y_valid = split_func(y)
+    else:
+        y_train = [[] for _ in y]
+        y_valid = [[] for _ in y]
+        for i, y_d in enumerate(y):
+            y_train[i], y_valid[i] = split_func(y_d)
+
+    return x_train, y_train, x_valid, y_valid
