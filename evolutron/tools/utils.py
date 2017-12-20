@@ -124,6 +124,7 @@ class Handle(object):
                  n_conv_layers=None,
                  n_fc_layers=None,
                  **kwargs):
+        print('WARNING: Handle will be deprecated in future release.')
         self.epochs = epochs
         self.filters = filters
         self.filter_size = filter_length
