@@ -39,11 +39,10 @@ class Motif(object):
 
 
 # noinspection PyShadowingNames
-def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth,
-                     data_dir=None, multi_input=False, filetype='png'):
-    foldername = 'motifs/' + str(handle) + '/{0}/'.format(depth + 1)
-    if data_dir:
-        foldername = os.path.join(data_dir, foldername)
+def motif_extraction(motif_fun, x_data, filters, kernel_size, output_foldername, depth,
+                     multi_input=False, filetype='txt+png'):
+    foldername = os.path.join(output_foldername, str(depth + 1))
+
     if not os.path.exists(foldername):
         os.makedirs(foldername)
     else:
@@ -108,17 +107,17 @@ def generate_logos(motifs, foldername, filetype='png'):
             my_format = wl.LogoFormat(motif.data, options)
             if 'png' in filetype:
                 to_write = wl.png_print_formatter(motif.data, my_format)
-                foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".png", "wb")
+                foo = open(os.path.join(foldername, str(i) + '_' + str(len(motif.seqs)) + ".png"), "wb")
                 foo.write(to_write)
                 foo.close()
             if 'pdf' in filetype:
                 to_write = wl.pdf_formatter(motif.data, my_format)
-                foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".pdf", "wb")
+                foo = open(os.path.join(foldername, str(i) + '_' + str(len(motif.seqs)) + ".pdf"), "wb")
                 foo.write(to_write)
                 foo.close()
             if 'txt' in filetype:
                 to_write = ''.join(["%s\n" % str(seq) for seq in motif.seqs])
-                foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".txt", "w")
+                foo = open(os.path.join(foldername, str(i) + '_' + str(len(motif.seqs)) + ".txt"), "w")
                 foo.write(to_write)
                 foo.close()
             else:
