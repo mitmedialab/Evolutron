@@ -41,7 +41,7 @@ class Motif(object):
 # noinspection PyShadowingNames
 def motif_extraction(motif_fun, x_data, filters, kernel_size, handle, depth,
                      data_dir=None, multi_input=False, filetype='png'):
-    foldername = 'motifs/' + str(handle).split('.')[0] + '/{0}/'.format(depth + 1)
+    foldername = 'motifs/' + str(handle) + '/{0}/'.format(depth + 1)
     if data_dir:
         foldername = os.path.join(data_dir, foldername)
     if not os.path.exists(foldername):
@@ -106,14 +106,20 @@ def generate_logos(motifs, foldername, filetype='png'):
     for i, motif in enumerate(motifs):
         if motif:
             my_format = wl.LogoFormat(motif.data, options)
-            if filetype == 'png':
+            if 'png' in filetype:
                 to_write = wl.png_print_formatter(motif.data, my_format)
-            elif filetype == 'pdf':
+                foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".png", "wb")
+                foo.write(to_write)
+                foo.close()
+            if 'pdf' in filetype:
                 to_write = wl.pdf_formatter(motif.data, my_format)
-            elif filetype == 'txt':
+                foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".pdf", "wb")
+                foo.write(to_write)
+                foo.close()
+            if 'txt' in filetype:
                 to_write = ''.join(["%s\n" % str(seq) for seq in motif.seqs])
+                foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + ".txt", "w")
+                foo.write(to_write)
+                foo.close()
             else:
                 raise ValueError('Invalid filetype. Available options: png, pdf or txt. ')
-            foo = open(foldername + str(i) + '_' + str(len(motif.seqs)) + "." + filetype, "wb")
-            foo.write(to_write)
-            foo.close()
