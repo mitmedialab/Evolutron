@@ -9,6 +9,6 @@ A mini deep learning framework for protein evolution.
 
 ## Packages using Evolutron
 
-* [CoMET](https://github.com/mitmedialab/CoMET)
+* [CoMET](https://github.com/thrakar9/CoMET)
 
 For more information contact [karydis \[at\] mit \[dot\] edu](mailto:karydis@mit.edu)
