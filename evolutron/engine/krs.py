@@ -376,7 +376,8 @@ class Model(keras.models.Model):
             handle.ftype = 'model'
             handle.epochs = len(self.history.epoch)
         else:
-            handle += '.model'
+            if '.model' not in handle:
+                handle += '.model'
 
         filename = 'models/' + handle
         if data_dir:
